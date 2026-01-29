@@ -20,11 +20,13 @@ print("\nWORKER INITIALIZED")
 torch.set_num_threads(8)
 
 NEED_TO_LEARN = False
-SAVED_MODEL_PATH = "./models/6841_music_model_1.pth"
+LOAD_LEARNED_MODEL = True
+SAVED_MODEL_PATH = "./models/4740_music_model_0.pth" #"./models/4962_music_model_0.pth"
 
 def learn_model(model, dataset, loss_function, optimizer, epochs_count, batch_size, save_model_id):
     # Обучение
     print("ОБУЧЕНИЕ НАЧАЛОСЬ!")
+    model.train()
     current_loss = None
     for epoch in range(epochs_count):
         train_loader = DataLoader(
@@ -37,7 +39,7 @@ def learn_model(model, dataset, loss_function, optimizer, epochs_count, batch_si
             pin_memory=True  # <--- Ускоряет передачу данных (особенно если есть GPU)
         )
 
-        for i, batch in enumerate(train_loader):
+        for i, batch in enumerate(islice(train_loader, 1200)):
             optimizer.zero_grad()
 
             prompts = batch.get('idx_prompts')
@@ -70,6 +72,7 @@ def learn_model(model, dataset, loss_function, optimizer, epochs_count, batch_si
 
 def use_model(model, dataset):
     # Использование
+    model.eval()
     config = TokenizerConfig(num_velocities=16, use_chords=True, use_programs=True)
     tokenizer = REMI(config)
     print("Токенайзер инициализирован!")
@@ -79,7 +82,7 @@ def use_model(model, dataset):
         words = input()
         if not words: break
 
-        words_idx = dataset.words_to_idx(words)
+        words_idx = dataset.words_to_idx(words.lower())
         print(words_idx)
         input_tensor = tensor([words_idx], dtype=torch.long)
 
@@ -89,17 +92,21 @@ def use_model(model, dataset):
         current_token = torch.tensor([[0]], dtype=torch.long)
 
         with torch.no_grad():
-            for _ in range(1000):
+            for _ in range(750):
                 logits, h, c = model(input_tensor, current_token, h, c)
 
-                temperature = 1.4
-                top_k = 10
+                temperature = 0.70
+                top_k = 50
 
                 next_token_logits = logits[0, -1, :] / temperature
                 threshold = torch.topk(next_token_logits, top_k).values[-1]
                 next_token_logits[next_token_logits < threshold] = -float('Inf')
-                probs = torch.softmax(next_token_logits, dim=-1)
 
+                DURATION_BOOST = 1.20
+                for idx in range(125 , 138):
+                    next_token_logits[idx] *= DURATION_BOOST
+
+                probs = torch.softmax(next_token_logits, dim=-1)
                 next_token = torch.multinomial(probs, num_samples=1)
 
                 token_val = next_token.item()
@@ -119,8 +126,8 @@ def use_model(model, dataset):
 
 def main():
     LEARNING_RATE = 0.0001
-    EPOCHS_COUNT = 2
-    BATCH_SIZE = 24
+    EPOCHS_COUNT = 1
+    BATCH_SIZE = 32
 
     dataset = MusicStreamingDataset(
         "./data/midi_words_prompts.jsonl",
@@ -135,6 +142,9 @@ def main():
     music_model = MusicNN(dataset.get_words_alphabet_len(), dataset.get_midi_alphabet_len())
     print("Модель инициализирована!")
 
+    if LOAD_LEARNED_MODEL:
+        checkpoint = torch.load(SAVED_MODEL_PATH, weights_only=False)
+        music_model.load_state_dict(checkpoint['model_state_dict'])
     if NEED_TO_LEARN:
         loss_function = nn.CrossEntropyLoss()
         optimizer = optim.Adam(music_model.parameters(), lr=LEARNING_RATE)
@@ -145,11 +155,6 @@ def main():
         learn_model(music_model, dataset, loss_function, optimizer, EPOCHS_COUNT, BATCH_SIZE, random.randint(1111, 9999))
         finish = datetime.datetime.now()
         print('Обучение завершено!\nВремя работы: ' + str(finish - start))
-    else:
-        checkpoint = torch.load(SAVED_MODEL_PATH, weights_only=False)
-        music_model.load_state_dict(checkpoint['model_state_dict'])
-        music_model.eval()  # Обязательно для использования
-
     use_model(music_model, dataset)
 
 if __name__ == "__main__":
@@ -161,7 +166,20 @@ if __name__ == "__main__":
 
 
 
-
+# top_p = 2.0
+#
+# next_token_logits = logits[0, -1, :].clone() / temperature
+# sorted_logits, sorted_indices = torch.sort(next_token_logits, descending=True)
+# cumulative_probs = torch.cumsum(torch.softmax(sorted_logits, dim=-1), dim=-1)
+# sorted_indices_to_remove = cumulative_probs > top_p
+# sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+# sorted_indices_to_remove[..., 0] = 0
+#
+# # Индексы, которые нужно убрать
+# indices_to_remove = sorted_indices[sorted_indices_to_remove]
+# next_token_logits[indices_to_remove] = -float('Inf')
+#
+# probs = torch.softmax(next_token_logits, dim=-1)
 
 
 # def parse_learn_couple(self, input_string, input_length):
