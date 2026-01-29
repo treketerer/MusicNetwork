@@ -33,7 +33,7 @@ def clean_vocabulary(all_tags_list, min_frequency=10):
 # Функция для ручного отбора тегов промптов
 def get_unique_words():
     wordslist = []
-    with open('all_midis_meta_data.jsonl', 'r', encoding='utf-8') as f:
+    with open('./meta/all_midis_meta_data.jsonl', 'r', encoding='utf-8') as f:
         for line in f:
             items = json.loads(line)
             now_item = items.get('metadata').split('\n')[2:]
@@ -45,7 +45,7 @@ def get_unique_words():
 
 def get_base_meta():
     wordslist = {}
-    with open('all_midis_meta_data.jsonl', 'r', encoding='utf-8') as f:
+    with open('./meta/all_midis_meta_data.jsonl', 'r', encoding='utf-8') as f:
         for line in f:
             now_line = set()
             items = json.loads(line)
@@ -61,7 +61,7 @@ def get_base_meta():
 
 def get_acoustic_meta():
     wordslist = {}
-    with open('all_midis_averages.jsonl', 'r', encoding='utf-8') as f:
+    with open('./meta/all_midis_averages.jsonl', 'r', encoding='utf-8') as f:
         for line in f:
             items = json.loads(line)
             track = items.get('md5')
@@ -72,25 +72,21 @@ def get_acoustic_meta():
 
             if tempo < 80:
                 word_tempo = 'Tempo_Slow'
-            elif 80 < tempo < 120:
+            elif tempo < 120:
                 word_tempo = "Tempo_Normal"
-            elif 121 < tempo < 160:
+            elif tempo < 160:
                 word_tempo = "Tempo_Fast"
-            elif 160 < tempo:
-                word_tempo = "Tempo_VeryFast"
             else:
-                word_tempo = "Tempo_Normal"
+                word_tempo = "Tempo_VeryFast"
 
             if velocity < 30:
                 word_velocity = 'Velocity_Pianissimo'
-            elif 31 < velocity < 60:
+            elif velocity < 60:
                 word_velocity = "Velocity_Piano"
-            elif 61 < velocity < 90:
+            elif velocity < 90:
                 word_velocity = "Velocity_Forte"
-            elif 91 < velocity < 127:
-                word_velocity = "Velocity_MezzoForte"
             else:
-                word_velocity = "Velocity_Forte"
+                word_velocity = "Velocity_MezzoForte"
 
             wordslist[track] = [word_tempo, word_velocity]
     return wordslist
@@ -105,7 +101,7 @@ def get_prompts_tags():
 
     prompts_keys_for_all_midi = []
 
-    # with open("../data/midi_prompt_meta_keys.jsonl", "w", encoding="utf-8") as f:
+    all_md5 = []
     for md5, key in base_meta.items():
         bm = base_meta.get(md5)
         am = ac_meta.get(md5)
@@ -123,7 +119,8 @@ def get_prompts_tags():
             "md5": md5,
             "prompt_keys": prompt_keys
         }
+        all_md5.append(md5)
         prompts_keys_for_all_midi.append(json_line)
         # f.write(json.dumps(json_line, ensure_ascii=False) + "\n")
 
-    return prompts_keys_for_all_midi
+    return all_md5, prompts_keys_for_all_midi

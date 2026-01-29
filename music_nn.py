@@ -5,27 +5,16 @@ from encoder_linear import EncoderLinear
 from decoder_lstm import DecoderLSTM
 
 class MusicNN(nn.Module):
-    def __init__(self, batch_size = 1):
+    def __init__(self, text_alphabet_size, midi_alphabet_size):
         super(MusicNN, self).__init__()
 
         self.inner_context_size = 256
 
-        self.encoder_model = EncoderLinear(self.inner_context_size, batch_size)
-        self.decoder_model = DecoderLSTM(self.inner_context_size, batch_size)
+        self.encoder_model = EncoderLinear(self.inner_context_size, text_alphabet_size)
+        self.decoder_model = DecoderLSTM(self.inner_context_size, midi_alphabet_size)
 
-        self.h0 = None
-        self.c0 = None
-        self.raw_h0 = None
-        self.raw_c0 = None
+    def forward(self, prompt_idx, midis_idx, h0 = None, c0 = None):
+        context = self.encoder_model(prompt_idx)
+        answer, hn, cn = self.decoder_model(context, midis_idx, h0, c0)
 
-    def forward(self, x):
-        context = self.encoder_model(x)
-        answer, h0, c0 = self.decoder_model(context)
-
-        self.raw_h0 = h0
-        self.raw_c0 = c0
-
-        return answer
-
-    def bake_memory(self):
-        self.h0, self.c0 = self.raw_h0.detach(), self.raw_c0.detach()
+        return answer, hn, cn

@@ -9,4 +9,7 @@ tokenizer = REMI(config)
 midi = Score("midi/00000b8982c198eb5ba5540ac0aa6358.mid")
 tokens = tokenizer(midi)  # calling the tokenizer will automatically detect MIDIs, paths and tokens
 print(tokenizer.vocab)
+
+vocab = tokenizer.vocab
+print(dict(zip(vocab.values(), vocab.keys())))
 # converted_back_midi = tokenizer(tokens)

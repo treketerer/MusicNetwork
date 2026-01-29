@@ -1,0 +1,47 @@
+Date : 2026-01-29 00:03:09
+Directory : c:\Project\MusicNetwork
+Total : 15 files,  2926 codes, 755 comments, 178 blanks, all 3859 lines
+
+Languages
++------------------+------------+------------+------------+------------+------------+
+| language         | files      | code       | comment    | blank      | total      |
++------------------+------------+------------+------------+------------+------------+
+| Python           |         10 |      2,890 |        755 |        178 |      3,823 |
+| XML              |          4 |         31 |          0 |          0 |         31 |
+| pip requirements |          1 |          5 |          0 |          0 |          5 |
++------------------+------------+------------+------------+------------+------------+
+
+Directories
++------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                   | files      | code       | comment    | blank      | total      |
++------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                      |         15 |      2,926 |        755 |        178 |      3,859 |
+| . (Files)                                                              |          8 |      2,589 |        417 |        117 |      3,123 |
+| .idea                                                                  |          4 |         31 |          0 |          0 |         31 |
+| .idea (Files)                                                          |          3 |         25 |          0 |          0 |         25 |
+| .idea\inspectionProfiles                                               |          1 |          6 |          0 |          0 |          6 |
+| data                                                                   |          2 |        214 |        326 |         36 |        576 |
+| meta                                                                   |          1 |         92 |         12 |         25 |        129 |
++------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++------------------------------------------------------------------------+------------------+------------+------------+------------+------------+
+| filename                                                               | language         | code       | comment    | blank      | total      |
++------------------------------------------------------------------------+------------------+------------+------------+------------+------------+
+| c:\Project\MusicNetwork\.idea\MusicNetwork.iml                         | XML              |         10 |          0 |          0 |         10 |
+| c:\Project\MusicNetwork\.idea\inspectionProfiles\profiles_settings.xml | XML              |          6 |          0 |          0 |          6 |
+| c:\Project\MusicNetwork\.idea\misc.xml                                 | XML              |          7 |          0 |          0 |          7 |
+| c:\Project\MusicNetwork\.idea\modules.xml                              | XML              |          8 |          0 |          0 |          8 |
+| c:\Project\MusicNetwork\data\keywords.py                               | Python           |        212 |        326 |         35 |        573 |
+| c:\Project\MusicNetwork\data\midi_alphabet.py                          | Python           |          2 |          0 |          1 |          3 |
+| c:\Project\MusicNetwork\decoder_lstm.py                                | Python           |         39 |          0 |         13 |         52 |
+| c:\Project\MusicNetwork\encoder_linear.py                              | Python           |         30 |          0 |         11 |         41 |
+| c:\Project\MusicNetwork\learndata.py                                   | Python           |      2,326 |        407 |         28 |      2,761 |
+| c:\Project\MusicNetwork\main.py                                        | Python           |         89 |          5 |         32 |        126 |
+| c:\Project\MusicNetwork\meta\metaparser.py                             | Python           |         92 |         12 |         25 |        129 |
+| c:\Project\MusicNetwork\music_nn.py                                    | Python           |         22 |          0 |          9 |         31 |
+| c:\Project\MusicNetwork\prepare_learn_data.py                          | Python           |         71 |          2 |         21 |         94 |
+| c:\Project\MusicNetwork\requirements.txt                               | pip requirements |          5 |          0 |          0 |          5 |
+| c:\Project\MusicNetwork\test.py                                        | Python           |          7 |          3 |          3 |         13 |
+| Total                                                                  |                  |      2,926 |        755 |        178 |      3,859 |
++------------------------------------------------------------------------+------------------+------------+------------+------------+------------+
