@@ -24,7 +24,7 @@ Total : 15 files,  2926 codes, 755 comments, 178 blanks, all 3859 lines
 | [meta/metaparser.py](/meta/metaparser.py) | Python | 92 | 12 | 25 | 129 |
 | [music\_nn.py](/music_nn.py) | Python | 22 | 0 | 9 | 31 |
 | [prepare\_learn\_data.py](/prepare_learn_data.py) | Python | 71 | 2 | 21 | 94 |
-| [requirements.txt](/requirements.txt) | pip requirements | 5 | 0 | 0 | 5 |
+| [requirements.txt](/requirements%20old.txt) | pip requirements | 5 | 0 | 0 | 5 |
 | [test.py](/test.py) | Python | 7 | 3 | 3 | 13 |
 
 [Summary](results.md) / Details / [Diff Summary](diff.md) / [Diff Details](diff-details.md)

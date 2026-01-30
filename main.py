@@ -15,18 +15,25 @@ from dataset import MusicStreamingDataset
 
 from miditok import REMI, TokenizerConfig
 
-
 print("\nWORKER INITIALIZED")
-torch.set_num_threads(8)
 
-NEED_TO_LEARN = False
-LOAD_LEARNED_MODEL = True
-SAVED_MODEL_PATH = "./models/4740_music_model_0.pth" #"./models/4962_music_model_0.pth"
+NEED_TO_LEARN = True
+LOAD_LEARNED_MODEL = False
+SAVED_MODEL_PATH = "/content/project/models/4740_music_model_0.pth" #"./models/4962_music_model_0.pth"
+
+
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+print(f"Обучение будет идти на {DEVICE}")
+if DEVICE == "cpu":
+    torch.set_num_threads(8)
 
 def learn_model(model, dataset, loss_function, optimizer, epochs_count, batch_size, save_model_id):
     # Обучение
-    print("ОБУЧЕНИЕ НАЧАЛОСЬ!")
     model.train()
+    model.to(DEVICE)
+    print("ОБУЧЕНИЕ НАЧАЛОСЬ!")
+
     current_loss = None
     for epoch in range(epochs_count):
         train_loader = DataLoader(
@@ -42,11 +49,11 @@ def learn_model(model, dataset, loss_function, optimizer, epochs_count, batch_si
         for i, batch in enumerate(islice(train_loader, 1200)):
             optimizer.zero_grad()
 
-            prompts = batch.get('idx_prompts')
-            tokens = batch.get('tokens')
+            prompts = batch.get('idx_prompts').to(DEVICE)
+            tokens = batch.get('tokens').to(DEVICE)
 
-            inp = tokens[:, :-1]
-            target = tokens[:, 1:]
+            inp = tokens[:, :-1].to(DEVICE)
+            target = tokens[:, 1:].to(DEVICE)
 
             logits, _, _ = model(prompts, inp, None, None)
 
@@ -54,14 +61,14 @@ def learn_model(model, dataset, loss_function, optimizer, epochs_count, batch_si
             current_loss.backward()
             optimizer.step()
 
-            if (i + 1) % 100 == 0:
+            if (i + 1) % 100 == 0 or i == 0:
                 # print(f"\nВвод: {now_control_inp}\nОжидаемое: {now_control_word}\nОтвет сети:",
                 #       model.alphabet_words[torch.argmax(output[0])])
                 print(f'Epoch {epoch} Iteration {i+1}, Loss: {current_loss.item():.4f}')
 
         print(f"Эпоха {epoch} завершена!")
 
-        path = f'./models/{save_model_id}_music_model_{epoch}.pth'
+        path = f'/content/project/models/{save_model_id}_music_model_{epoch}.pth'
         torch.save({
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
@@ -71,6 +78,9 @@ def learn_model(model, dataset, loss_function, optimizer, epochs_count, batch_si
         print(f"Модель сохранена в {path}")
 
 def use_model(model, dataset):
+    DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(DEVICE)
+
     # Использование
     model.eval()
     config = TokenizerConfig(num_velocities=16, use_chords=True, use_programs=True)
@@ -84,12 +94,12 @@ def use_model(model, dataset):
 
         words_idx = dataset.words_to_idx(words.lower())
         print(words_idx)
-        input_tensor = tensor([words_idx], dtype=torch.long)
+        input_tensor = tensor([words_idx], dtype=torch.long).to(DEVICE)
 
         outputs_tokens = []
         h, c = None, None
 
-        current_token = torch.tensor([[0]], dtype=torch.long)
+        current_token = torch.tensor([[0]], dtype=torch.long).to(DEVICE)
 
         with torch.no_grad():
             for _ in range(750):
@@ -130,10 +140,10 @@ def main():
     BATCH_SIZE = 32
 
     dataset = MusicStreamingDataset(
-        "./data/midi_words_prompts.jsonl",
-        "./data/midi_idx_prompts.jsonl",
-        "./data/words_alphabet.jsonl",
-        "./data/parsed_midi.jsonl",
+        "/content/project/data/midi_words_prompts.jsonl",
+        "/content/project/data/midi_idx_prompts.jsonl",
+        "/content/project/data/words_alphabet.jsonl",
+        "/content/project/data/parsed_midi.jsonl",
         buffer_size=256
     )
 

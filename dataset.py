@@ -6,7 +6,7 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import IterableDataset
 import json
 
-from data.midi_alphabet import midi_alph_midi, midi_alph_idx
+from content.project.data.midi_alphabet import midi_alph_midi, midi_alph_idx
 
 class MusicStreamingDataset(IterableDataset):
     def __init__(self, word_prompts_path, idx_prompts_path, words_alphabet_path, parsed_midi_path, buffer_size=1000):
@@ -19,7 +19,6 @@ class MusicStreamingDataset(IterableDataset):
 
         self.words_alphabet_idx = None
         self.words_alphabet_words = None
-
 
         self.max_buffet_len = buffer_size
 
