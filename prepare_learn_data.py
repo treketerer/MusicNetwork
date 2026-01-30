@@ -1,7 +1,7 @@
 import json
 import random
 
-from data.keywords import prompts_by_key
+from content.project.data.keywords import prompts_by_key
 from meta.metaparser import get_prompts_tags
 
 import os
@@ -65,10 +65,10 @@ def get_midi_prompt(prompts_tags):
 
 
 def save_prompts(midi_prompt):
-    words_prompts_file = open("./data/midi_words_prompts.jsonl", 'w', encoding='utf-8')
-    idx_prompts_file = open("./data/midi_idx_prompts.jsonl", 'w', encoding='utf-8')
+    words_prompts_file = open("./content/project/data/midi_words_prompts.jsonl", 'w', encoding='utf-8')
+    idx_prompts_file = open("./content/project/data/midi_idx_prompts.jsonl", 'w', encoding='utf-8')
 
-    alphabet_file = open("./data/words_alphabet.jsonl", 'r', encoding='utf-8')
+    alphabet_file = open("./content/project/data/words_alphabet.jsonl", 'r', encoding='utf-8')
     alphabet_file.readline()
     raw_words_alphabet = alphabet_file.readline()
     words_alphabet = json.loads(raw_words_alphabet)
@@ -113,7 +113,7 @@ def init_embeddings():
     alph_dict = dict(enumerate(alph_list))
     reverse_alph_dict = {v: k for k, v in alph_dict.items()}
 
-    with open("./data/words_alphabet.jsonl", "w", encoding="utf-8") as f:
+    with open("./content/project/data/words_alphabet.jsonl", "w", encoding="utf-8") as f:
         f.write(json.dumps(alph_dict, ensure_ascii=False) + "\n")
         f.write(json.dumps(reverse_alph_dict, ensure_ascii=False) + "\n")
 
@@ -149,8 +149,8 @@ def process_single_midi(md5):
 
 def parse_midi_tokens(md5_paths):
     parsed_files = set()
-    if os.path.exists("./data/parsed_midi.jsonl"):
-        with open("./data/parsed_midi.jsonl", "r", encoding="utf-8") as f:
+    if os.path.exists("./content/project/data/parsed_midi.jsonl"):
+        with open("./content/project/data/parsed_midi.jsonl", "r", encoding="utf-8") as f:
             for line in f:
                 data = json.loads(line)
                 parsed_files.add(data.get('md5'))
@@ -162,7 +162,7 @@ def parse_midi_tokens(md5_paths):
 
     workers = max(1, cpu_count() - 1)
 
-    with open("./data/parsed_midi.jsonl", "a", encoding="utf-8") as f:
+    with open("./content/project/data/parsed_midi.jsonl", "a", encoding="utf-8") as f:
         with concurrent.futures.ProcessPoolExecutor(max_workers=workers, initializer=init_worker) as executor:
             results_iterator = executor.map(process_single_midi, to_process, chunksize=10)
 
@@ -184,9 +184,8 @@ def main():
     print("ПРОМПТЫ СОСТАВЛЕНЫ!")
     save_prompts(midi_prompts)
     print("ПРОМПТЫ СОХРАНЕНЫ В ФАЙЛ!")
-
-    # parse_midi_tokens(all_md5)
-    # print("MIDI ФАЙЛЫ ПРЕОБРАЗОВАНЫ В АЛФАВИТ!")
+    parse_midi_tokens(all_md5)
+    print("MIDI ФАЙЛЫ ПРЕОБРАЗОВАНЫ В АЛФАВИТ!")
 
 if __name__ == "__main__":
     main()

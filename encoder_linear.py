@@ -9,16 +9,28 @@ class EncoderLinear(nn.Module):
         self.alphabet_emb = None
         self.alphabet_words = None
 
-        self.middle_count = 512
-        self.emb_length = 128
+        self.middle_dim = 1024
+        self.emb_length = 512
         self.max_prompt_len = 7
         self.output_length = inner_context_size
 
         self.alphabet_size = alphabet_size
 
         self.embeddings_layer = nn.Embedding(num_embeddings=self.alphabet_size, embedding_dim=self.emb_length)
-        self.fc1 = nn.Linear(self.emb_length * self.max_prompt_len, self.middle_count)
-        self.fc2 = nn.Linear(self.middle_count, self.output_length)
+
+        self.encoder = nn.Sequential(
+            nn.Linear(self.emb_length * self.max_prompt_len, self.middle_dim),
+            nn.ReLU(),
+            nn.LayerNorm(self.middle_dim),
+            nn.Linear(self.middle_dim, self.middle_dim),
+            nn.GELU(),
+            nn.Linear(self.middle_dim, self.middle_dim),
+            nn.GELU(),
+            nn.Linear(self.middle_dim, self.middle_dim),
+            nn.GELU(),
+            nn.Linear(self.middle_dim, self.output_length),  # Возвращаемся к размеру для LSTM
+            nn.LayerNorm(self.output_length)
+        )
 
     def forward(self, x):
         if x.size(1) < self.max_prompt_len:
@@ -26,9 +38,8 @@ class EncoderLinear(nn.Module):
             x = torch.cat([x, pad], dim=1)
         else:
             x = x[:, :self.max_prompt_len]
-        input_emb = self.embeddings_layer(x)
-        flat_embeds = input_emb.view(input_emb.size(0), -1)
+        x = self.embeddings_layer(x)
+        x = x.view(x.size(0), -1)
 
-        x = torch.relu(self.fc1(flat_embeds))
-        x = self.fc2(x)
+        x = self.encoder(x)
         return x

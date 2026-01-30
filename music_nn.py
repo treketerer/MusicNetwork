@@ -8,7 +8,7 @@ class MusicNN(nn.Module):
     def __init__(self, text_alphabet_size, midi_alphabet_size):
         super(MusicNN, self).__init__()
 
-        self.inner_context_size = 256
+        self.inner_context_size = 1024
 
         self.encoder_model = EncoderLinear(self.inner_context_size, text_alphabet_size)
         self.decoder_model = DecoderLSTM(self.inner_context_size, midi_alphabet_size)

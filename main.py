@@ -17,14 +17,14 @@ from miditok import REMI, TokenizerConfig
 
 print("\nWORKER INITIALIZED")
 
-NEED_TO_LEARN = True
-LOAD_LEARNED_MODEL = False
-SAVED_MODEL_PATH = "/content/project/models/4740_music_model_0.pth" #"./models/4962_music_model_0.pth"
+NEED_TO_LEARN = False
+LOAD_LEARNED_MODEL = True
+SAVED_MODEL_PATH = "./content/project/models/2803_music_model_6.pth" #"./models/4962_music_model_0.pth"
 
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-print(f"Обучение будет идти на {DEVICE}")
+print(f"Работа будет идти на {DEVICE}")
 if DEVICE == "cpu":
     torch.set_num_threads(8)
 
@@ -105,15 +105,15 @@ def use_model(model, dataset):
             for _ in range(750):
                 logits, h, c = model(input_tensor, current_token, h, c)
 
-                temperature = 0.70
-                top_k = 50
+                temperature = 0.7
+                top_k = 80
 
                 next_token_logits = logits[0, -1, :] / temperature
                 threshold = torch.topk(next_token_logits, top_k).values[-1]
                 next_token_logits[next_token_logits < threshold] = -float('Inf')
 
-                DURATION_BOOST = 1.20
-                for idx in range(125 , 138):
+                DURATION_BOOST = 0.55
+                for idx in range(110 , 125):
                     next_token_logits[idx] *= DURATION_BOOST
 
                 probs = torch.softmax(next_token_logits, dim=-1)
@@ -136,15 +136,15 @@ def use_model(model, dataset):
 
 def main():
     LEARNING_RATE = 0.0001
-    EPOCHS_COUNT = 1
-    BATCH_SIZE = 32
+    EPOCHS_COUNT = 10
+    BATCH_SIZE = 128
 
     dataset = MusicStreamingDataset(
-        "/content/project/data/midi_words_prompts.jsonl",
-        "/content/project/data/midi_idx_prompts.jsonl",
-        "/content/project/data/words_alphabet.jsonl",
-        "/content/project/data/parsed_midi.jsonl",
-        buffer_size=256
+        "./content/project/data/midi_words_prompts.jsonl",
+        "./content/project/data/midi_idx_prompts.jsonl",
+        "./content/project/data/words_alphabet.jsonl",
+        "./content/project/data/parsed_midi.jsonl",
+        buffer_size=1500
     )
 
     print("Датасет инициализирован!")
@@ -153,7 +153,7 @@ def main():
     print("Модель инициализирована!")
 
     if LOAD_LEARNED_MODEL:
-        checkpoint = torch.load(SAVED_MODEL_PATH, weights_only=False)
+        checkpoint = torch.load(SAVED_MODEL_PATH, weights_only=False, map_location=torch.device(DEVICE))
         music_model.load_state_dict(checkpoint['model_state_dict'])
     if NEED_TO_LEARN:
         loss_function = nn.CrossEntropyLoss()
