@@ -1,7 +1,7 @@
 import json
 import random
 
-from content.project.data.keywords import prompts_by_key
+from keywords import prompts_by_key
 from meta.metaparser import get_prompts_tags
 
 import os

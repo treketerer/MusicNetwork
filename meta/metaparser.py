@@ -2,7 +2,7 @@ import json
 from collections import Counter
 import re
 
-from content.project.data.keywords import prompts_by_key
+from keywords import prompts_by_key
 
 # ФАЙЛ ДЛЯ ПРЕОБРАЗОВАНИЯ МЕТА ДАННЫХ В ТЕГИ ПРОМПТОВ
 
