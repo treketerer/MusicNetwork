@@ -21,15 +21,10 @@ class EncoderLinear(nn.Module):
         self.encoder = nn.Sequential(
             nn.Linear(self.emb_length * self.max_prompt_len, self.middle_dim),
             nn.ReLU(),
+            nn.Linear(self.middle_dim, self.middle_dim),
+            nn.ReLU(),
             nn.LayerNorm(self.middle_dim),
-            nn.Linear(self.middle_dim, self.middle_dim),
-            nn.GELU(),
-            nn.Linear(self.middle_dim, self.middle_dim),
-            nn.GELU(),
-            nn.Linear(self.middle_dim, self.middle_dim),
-            nn.GELU(),
-            nn.Linear(self.middle_dim, self.output_length),  # Возвращаемся к размеру для LSTM
-            nn.LayerNorm(self.output_length)
+            nn.Linear(self.middle_dim, self.output_length),
         )
 
     def forward(self, x):

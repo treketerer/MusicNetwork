@@ -12,7 +12,7 @@ class DecoderLSTM(nn.Module):
         self.midi_embeddings = nn.Embedding(alphabet_size, self.emb_length)
 
         self.hidden_state = input_size
-        self.layer_dim = 5
+        self.layer_dim = 3
         self.lstm = nn.LSTM(
             input_size=self.emb_length,
             hidden_size=self.hidden_state,

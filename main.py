@@ -34,48 +34,54 @@ def learn_model(model, dataset, loss_function, optimizer, epochs_count, batch_si
     model.to(DEVICE)
     print("ОБУЧЕНИЕ НАЧАЛОСЬ!")
 
+    epoch = 0
     current_loss = None
-    for epoch in range(epochs_count):
-        train_loader = DataLoader(
-            dataset,
-            batch_size=batch_size,
-            num_workers=2,  # <--- Задействуем 8 ядер для чтения и парсинга
-            persistent_workers=True,  # <--- Не убивать воркеры после эпохи (важно для Windows!)
-            prefetch_factor=2,  # <--- Каждый воркер заранее готовит по 2 батча
-            collate_fn=dataset.collate_fn,
-            pin_memory=True  # <--- Ускоряет передачу данных (особенно если есть GPU)
-        )
 
-        for i, batch in enumerate(islice(train_loader, 1200)):
-            optimizer.zero_grad()
+    try:
+        for epoch in range(epochs_count):
+            train_loader = DataLoader(
+                dataset,
+                batch_size=batch_size,
+                num_workers=2,  # <--- Задействуем 8 ядер для чтения и парсинга
+                persistent_workers=True,  # <--- Не убивать воркеры после эпохи (важно для Windows!)
+                prefetch_factor=2,  # <--- Каждый воркер заранее готовит по 2 батча
+                collate_fn=dataset.collate_fn,
+                pin_memory=True  # <--- Ускоряет передачу данных (особенно если есть GPU)
+            )
 
-            prompts = batch.get('idx_prompts').to(DEVICE)
-            tokens = batch.get('tokens').to(DEVICE)
+            for i, batch in enumerate(train_loader):
+                optimizer.zero_grad()
 
-            inp = tokens[:, :-1].to(DEVICE)
-            target = tokens[:, 1:].to(DEVICE)
+                prompts = batch.get('idx_prompts').to(DEVICE)
+                tokens = batch.get('tokens').to(DEVICE)
 
-            logits, _, _ = model(prompts, inp, None, None)
+                inp = tokens[:, :-1].to(DEVICE)
+                target = tokens[:, 1:].to(DEVICE)
 
-            current_loss = loss_function(logits.reshape(-1, logits.size(-1)), target.reshape(-1))
-            current_loss.backward()
-            optimizer.step()
+                logits, _, _ = model(prompts, inp, None, None)
 
-            if (i + 1) % 100 == 0 or i == 0:
-                # print(f"\nВвод: {now_control_inp}\nОжидаемое: {now_control_word}\nОтвет сети:",
-                #       model.alphabet_words[torch.argmax(output[0])])
-                print(f'Epoch {epoch} Iteration {i+1}, Loss: {current_loss.item():.4f}')
+                current_loss = loss_function(logits.reshape(-1, logits.size(-1)), target.reshape(-1))
+                current_loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                optimizer.step()
 
-        print(f"Эпоха {epoch} завершена!")
+                if (i + 1) % 100 == 0 or i == 0:
+                    print(f'Epoch {epoch} Iteration {i+1}, Loss: {current_loss.item():.4f}')
 
-        path = f'/content/project/models/{save_model_id}_music_model_{epoch}.pth'
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': current_loss.item(),
-        }, path)
-        print(f"Модель сохранена в {path}")
+            print(f"Эпоха {epoch} завершена!")
+            save_model(save_model_id, epoch, model, optimizer, current_loss)
+    except:
+        save_model(save_model_id, epoch, model, optimizer, current_loss)
+
+def save_model(save_model_id, epoch, model, optimizer, current_loss):
+    path = f'/content/project/models/{save_model_id}_music_model_{epoch}.pth'
+    torch.save({
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss': current_loss.item(),
+    }, path)
+    print(f"Модель сохранена в {path}")
 
 def use_model(model, dataset):
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
