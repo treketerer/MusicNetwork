@@ -50,7 +50,6 @@ class MusicStreamingDataset(IterableDataset):
                     self.tracks_metadata[now_idx_md5] = {'md5': now_idx_md5}
                 self.tracks_metadata[now_idx_md5]['idx_prompt'] = idx_data.get('prompt_keys')
 
-        print(self.words_alphabet_idx, self.words_alphabet_words)
     def get_words_alphabet_len(self):
         return len(self.words_alphabet_words)
 
@@ -94,7 +93,7 @@ class MusicStreamingDataset(IterableDataset):
         md5 = parsed.get("md5")
         tokens = parsed.get('tokens')
 
-        MAX_SEQ_LEN = 512
+        MAX_SEQ_LEN = 756
         if len(tokens) > MAX_SEQ_LEN:
             tokens = tokens[:MAX_SEQ_LEN]
 

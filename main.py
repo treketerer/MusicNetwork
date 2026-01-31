@@ -14,31 +14,34 @@ from miditok import REMI, TokenizerConfig
 
 # CONFIGS
 BATCH_SIZE = 192
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.0005
 EPOCHS_COUNT = 5
 BUFFER_SIZE = 1500
 PRINT_COEF = 50
 
-TEMPERATURE = 0.8
-TOP_K = 50
-USE_TOKENS_OUT_COUNT = 500
+TEMPERATURE = 0.83
+TOP_K = 60
+USE_TOKENS_OUT_COUNT = 750
+DURATION_COEF = 1.4 #38
 
 paths = {
     "collab": "/content/data",
     "collab_output": "/content/project/models",
-    "kaggle": "/kaggle/input/music_dataset",
-    "kaggle_output": "/kaggle/working",
+    "kaggle_dataset": "/kaggle/input/music-dataset",
+    "kaggle_input_models": "/kaggle/input/models",
+    "kaggle_output_models": "/kaggle/working",
     "local": "./data",
-    "local_output": "./models"
+    "local_models": "./models"
 }
 
-data_path = paths.get("kaggle")
-model_save_path = paths.get("kaggle_output")
+data_path = paths.get("local")
+model_input_path = paths.get("local_models")
+model_output_path = paths.get("local_models")
 
 
 NEED_TO_LEARN = False
 LOAD_LEARNED_MODEL = True
-SAVED_MODEL_PATH = f"{data_path}/2818_music_model_0.pth" #"./models/4962_music_model_0.pth"
+SAVED_MODEL_PATH = f"{model_input_path}/4_music_model_2.pth" #"./models/4962_music_model_0.pth"
 
 # START LOGIC
 
@@ -47,6 +50,7 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Работа будет идти на {DEVICE}")
 if DEVICE == "cpu":
     torch.set_num_threads(8)
+
 
 def learn_model(model, dataset, loss_function, optimizer, epochs_count, batch_size, save_model_id):
     # Обучение
@@ -86,15 +90,18 @@ def learn_model(model, dataset, loss_function, optimizer, epochs_count, batch_si
                 optimizer.step()
 
                 if (i + 1) % PRINT_COEF == 0 or i == 0:
-                    print(f'Epoch {epoch} Iteration {i+1}, Loss: {current_loss.item():.4f}')
+                    print(f'Epoch {epoch} Iteration {i + 1}, Loss: {current_loss.item():.4f}')
 
             print(f"Эпоха {epoch} завершена!")
             save_model(save_model_id, epoch, model, optimizer, current_loss)
-    except:
-        save_model(save_model_id, epoch, model, optimizer, current_loss)
+    except Exception as e:
+        print(f"Ошибка во время обучения: {e}")
+        if current_loss is not None:
+            save_model(save_model_id, epoch, model, optimizer, current_loss)
+
 
 def save_model(save_model_id, epoch, model, optimizer, current_loss):
-    path = f"{model_save_path}/models/{save_model_id}_music_model_{epoch}.pth"
+    path = f"{model_output_path}/{save_model_id}_music_model_{epoch}.pth"
     torch.save({
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
@@ -102,6 +109,7 @@ def save_model(save_model_id, epoch, model, optimizer, current_loss):
         'loss': current_loss.item(),
     }, path)
     print(f"Модель сохранена в {path}")
+
 
 def use_model(model, dataset):
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -125,19 +133,17 @@ def use_model(model, dataset):
         outputs_tokens = []
         h, c = None, None
 
-        current_token = torch.tensor([[0]], dtype=torch.long).to(DEVICE)
+        current_token = torch.tensor([[1]], dtype=torch.long).to(DEVICE)
 
         with torch.no_grad():
             for _ in range(USE_TOKENS_OUT_COUNT):
                 logits, h, c = model(input_tensor, current_token, h, c)
 
                 next_token_logits = logits[0, -1, :] / TEMPERATURE
+                next_token_logits[110:130] /= DURATION_COEF
+
                 threshold = torch.topk(next_token_logits, TOP_K).values[-1]
                 next_token_logits[next_token_logits < threshold] = -float('Inf')
-
-                DURATION_BOOST = 0.55
-                for idx in range(110 , 125):
-                    next_token_logits[idx] *= DURATION_BOOST
 
                 probs = torch.softmax(next_token_logits, dim=-1)
                 next_token = torch.multinomial(probs, num_samples=1)
@@ -157,6 +163,7 @@ def use_model(model, dataset):
         except Exception as e:
             print(f"Ошибка сохранения MIDI: {e}")
 
+
 def main():
     dataset = MusicStreamingDataset(
         f"{data_path}/parsed_midi.jsonl",
@@ -172,27 +179,36 @@ def main():
     music_model = MusicNN(dataset.get_words_alphabet_len(), dataset.get_midi_alphabet_len())
     print("Модель инициализирована!")
 
+    optimizer = optim.Adam(music_model.parameters(), lr=LEARNING_RATE)
+
     if LOAD_LEARNED_MODEL:
         checkpoint = torch.load(SAVED_MODEL_PATH, weights_only=False, map_location=torch.device(DEVICE))
         music_model.load_state_dict(checkpoint['model_state_dict'])
+        if 'optimizer_state_dict' in checkpoint:
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            # Принудительно переносим состояние оптимизатора на GPU
+            for state in optimizer.state.values():
+                for k, v in state.items():
+                    if isinstance(v, torch.Tensor):
+                        state[k] = v.to(DEVICE)
     if NEED_TO_LEARN:
         loss_function = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(music_model.parameters(), lr=LEARNING_RATE)
         print("Оптимизаторы инициализированы!")
 
         start = datetime.datetime.now()
         print("ОБУЧЕНИЕ НАЧАЛОСЬ!")
-        learn_model(music_model, dataset, loss_function, optimizer, EPOCHS_COUNT, BATCH_SIZE, random.randint(1111, 9999))
+        learn_model(music_model, dataset, loss_function, optimizer, EPOCHS_COUNT, BATCH_SIZE,
+                    random.randint(1111, 9999))
         finish = datetime.datetime.now()
         print('Обучение завершено!\nВремя работы: ' + str(finish - start))
-    # else:
-    #     use_model(music_model, dataset)
+    else:
+        use_model(music_model, dataset)
+
 
 if __name__ == "__main__":
     main()
 
 print("\nWORKER INITIALIZED")
-
 
 
 # top_p = 2.0
