@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 
-from encoder_linear import EncoderLinear
-from decoder_lstm import DecoderLSTM
+from .encoder_linear import EncoderLinear
+from .decoder_lstm import DecoderLSTM
 
 class MusicNN(nn.Module):
     def __init__(self, text_alphabet_size, midi_alphabet_size):

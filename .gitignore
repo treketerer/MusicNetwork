@@ -1,3 +1,7 @@
 *.mid
 *.jsonl
 *.pth
+old/
+mp3/
+midi/
+*.sf2

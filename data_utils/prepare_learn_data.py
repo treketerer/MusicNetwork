@@ -1,8 +1,8 @@
 import json
 import random
 
-from keywords import prompts_by_key
-from meta.metaparser import get_prompts_tags
+from ..data.keywords import prompts_by_key
+from .metaparser import get_prompts_tags
 
 import os
 
