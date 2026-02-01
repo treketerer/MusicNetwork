@@ -26,11 +26,6 @@ EPOCHS_COUNT = 5
 BUFFER_SIZE = 1500
 PRINT_COEF = 50
 
-# TEMPERATURE = 0.83
-# TOP_K = 60
-# USE_TOKENS_OUT_COUNT = 750
-# DURATION_COEF = 1.4 #38
-
 paths = {
     "collab": "/content/data",
     "collab_output": "/content/project/models",
@@ -121,12 +116,12 @@ def main():
                 with gr.Row():
                     with gr.Column(scale=1):
                         input_prompt = gr.Text(label='Промпт')
-                        input_temp = gr.Slider(label='Температура', value=0.8, minimum=0.1, maximum=1.5, step=0.01)
+                        input_temp = gr.Slider(label='Температура', value=0.8, minimum=0.1, maximum=2.0, step=0.01)
                         input_top_k = gr.Slider(label='Top-K',
                                                 info="Число рассматриваемых вариантов ответа, меньше - меньше бреда и скучнее",
                                                 value=50, minimum=5, maximum=200, step=5)
-                        input_coef = gr.Slider(label='Коэф. длительности', info="Коэфициент количества коротких нот",
-                                               value=1.35,
+                        input_coef = gr.Slider(label='Коэфициент длительности', info="Коэфициент количества коротких нот",
+                                               value=0.65,
                                                minimum=0.1,
                                                maximum=2.0, step=0.05)
                         input_tokens = gr.Number(label='Число токенов на выходе', value=1000, step=100)
@@ -149,7 +144,6 @@ def main():
 def gradio_use(prompt: str, temperature: float, top_k: int, duration: float, output_count: int):
     print("Генераци через Gradio")
     return use_model(USE_MODEL, USE_DATASET, prompt, temperature, top_k, duration, output_count, SOUND_FONT_PATH)
-
 
 if __name__ == "__main__":
     main()

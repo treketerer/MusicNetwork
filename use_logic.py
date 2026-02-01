@@ -39,7 +39,7 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
             logits, h, c = model(input_tensor, current_token, h, c)
 
             next_token_logits = logits[0, -1, :] / temperature
-            next_token_logits[110:130] /= duration
+            next_token_logits[110:130] /= (2-duration)
 
             next_token_logits = torch.nan_to_num(next_token_logits, nan=0.0, posinf=10.0, neginf=-10.0)
             # next_token_logits = torch.clamp(next_token_logits, -20.0, 20.0)  # жёсткие границы
@@ -69,7 +69,7 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
 
         # Накладывание эффектов
         audio, sr = sf.read(mp3_path)
-        reverb = Reverb(room_size=0.08)
+        reverb = Reverb(room_size=0.05)
         board = Pedalboard([reverb])
         effected = board(audio, sr)
         sf.write(mp3_path, effected, sr)
