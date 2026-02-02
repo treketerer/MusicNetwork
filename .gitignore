@@ -6,3 +6,7 @@ mp3/
 midi/
 *.sf2
 *.mp3
+.gradio/
+.idea/
+__pycache__
+test.py
