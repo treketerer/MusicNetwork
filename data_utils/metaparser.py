@@ -2,50 +2,60 @@ import json
 from collections import Counter
 import re
 
-from data.keywords import prompts_by_key
+# from data.keywords import prompts_by_key
 
 # ФАЙЛ ДЛЯ ПРЕОБРАЗОВАНИЯ МЕТА ДАННЫХ В ТЕГИ ПРОМПТОВ
 
-# очистка данных
-def clean_vocabulary(all_tags_list, min_frequency=10):
-    cleaned_list = []
-    for tag in all_tags_list:
-        # Убираем теги короче 2 символов и длиннее 20
-        if len(tag) > 20: continue
-        # Убираем теги, где есть перемешанные цифры и буквы (похоже на ID)
-        if re.search(r'\d', tag) and re.search(r'[a-zA-Z]', tag): continue
-        # Убираем расширения файлов
-        if tag.endswith(('.mxl', '.mid', '.midi')): continue
-        cleaned_list.append(tag)
-
-    # 2. Считаем частоту каждого слова
-    counts = Counter(cleaned_list)
-
-    # 3. Оставляем только те, что встречаются хотя бы N раз
-    # Это автоматически выкинет редких авторов и опечатки
-    final_vocab = [word for word, freq in counts.items() if freq >= min_frequency]
-
-    print(f"Было слов: {len(set(all_tags_list))}")
-    print(f"Стало слов: {len(final_vocab)}")
-
-    return sorted(final_vocab)
-
 # Функция для ручного отбора тегов промптов
-def get_unique_words():
-    wordslist = []
-    with open('./meta/all_midis_meta_data.jsonl', 'r', encoding='utf-8') as f:
-        for line in f:
-            items = json.loads(line)
-            now_item = items.get('metadata').split('\n')[2:]
-            for word in now_item:
-                wordslist.append(word)
 
-    print("FINISHED")
-    print(clean_vocabulary(wordslist, 50))
+def get_bigrams(split_string):
+    # Создаем пары: (слово1, слово2), (слово2, слово3)
+    bigrams = []
+    ban_list = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'and', 'in', 'on', 'a', 'the']
+    for i in range(len(split_string) - 1):
+        if (split_string[i] not in ban_list) and (split_string[i + 1]not in ban_list):
+            bigrams.append(f"{split_string[i]} {split_string[i + 1]}")
+    return bigrams
+
+def get_unique_words():
+    min_frequency = 30
+
+    counts = Counter()
+
+    print("Старт get_unique_words")
+    with open('../data/meta/identified_midis_data.jsonl', 'r', encoding='utf-8') as f:
+    # with open('../data/meta/all_midis_text_captions.jsonl', 'r', encoding='utf-8') as f:
+
+        for i, line in enumerate(f):
+            items = json.loads(line)
+            now_item = items.get('music_description')
+            now_item += f" {items.get('genre')}"
+            now_item += f" {items.get('style')}"
+            now_item += f" {items.get('mood')}"
+            now_item = re.sub(r'[^\w\s-]', '', now_item)
+            now_item = now_item.lower().split()
+
+            # Считаем пары слов
+            counts.update(get_bigrams(now_item))
+
+            # for tag in now_item:
+            #     # if len(tag) > 20: continue
+            #     if not tag: continue
+            #     counts[tag] += 1
+
+            if i % 100000 == 0:
+                print(i, "строк обработано")
+
+        final_vocab = [word for word, freq in counts.items() if freq >= min_frequency]
+        print(f"Стало слов: {len(final_vocab)}")
+        return sorted(final_vocab)
+
+print(get_unique_words())
 
 def get_base_meta():
+    prompts_by_key = {}
     wordslist = {}
-    with open('./meta/all_midis_meta_data.jsonl', 'r', encoding='utf-8') as f:
+    with open('../data/meta/all_midis_meta_data.jsonl', 'r', encoding='utf-8') as f:
         for line in f:
             now_line = set()
             items = json.loads(line)
@@ -61,7 +71,7 @@ def get_base_meta():
 
 def get_acoustic_meta():
     wordslist = {}
-    with open('./meta/all_midis_averages.jsonl', 'r', encoding='utf-8') as f:
+    with open('../data/meta/all_midis_averages.jsonl', 'r', encoding='utf-8') as f:
         for line in f:
             items = json.loads(line)
             track = items.get('md5')
