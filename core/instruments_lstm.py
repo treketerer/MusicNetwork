@@ -3,14 +3,15 @@ import torch.nn as nn
 from torch import tensor
 
 class InstrumentsLSTM(nn.Module):
-    def __init__(self, input_size: int, instruments_count: int, midi_emb_size: int):
+    def __init__(self, conductor_context_size: int, instruments_count: int, instruments_emb_size: int, midi_emb_size: int):
         super(InstrumentsLSTM, self).__init__()
 
         self.instruments_count = instruments_count
 
         self.midi_embeddings = nn.Embedding(self.instruments_count, midi_emb_size)
 
-        self.hidden_state = input_size
+        self.input_size = conductor_context_size + instruments_emb_size + midi_emb_size
+        self.hidden_state = self.input_size
         self.layer_dim = 3
         self.lstm = nn.LSTM(
             input_size=self.hidden_state,

@@ -5,8 +5,7 @@ class InstrumentsMultiHotLinearParser(nn.Module):
     def __init__(self, input_dim: int, inner_dim: int, output_dim: int):
         super(InstrumentsMultiHotLinearParser, self).__init__()
 
-        self.multi_hot = torch.zeros(input_dim)
-
+        self.input_dim = input_dim
         self.parser = nn.Sequential(
             nn.Linear(input_dim, inner_dim),
             nn.ReLU(),
@@ -15,8 +14,9 @@ class InstrumentsMultiHotLinearParser(nn.Module):
         )
 
     def forward(self, instruments_idx):
-        self.multi_hot = self.multi_hot.scatter_(0, instruments_idx, 1)
-        x = self.parser(self.multi_hot)
+        zeros = torch.zeros(self.input_dim)
+        multi_hot = zeros.scatter_(0, instruments_idx, 1)
+        x = self.parser(multi_hot)
         return x
 
 class ConductorInstrumentsParser(nn.Module):

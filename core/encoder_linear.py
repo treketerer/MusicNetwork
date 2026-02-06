@@ -11,7 +11,6 @@ class EncoderLinear(nn.Module):
 
         self.middle_dim = 1024
         self.emb_length = 512
-        self.max_prompt_len = 7
         self.output_length = inner_context_size
 
         self.alphabet_size = alphabet_size
@@ -19,7 +18,7 @@ class EncoderLinear(nn.Module):
         self.embeddings_layer = nn.Embedding(num_embeddings=self.alphabet_size, embedding_dim=self.emb_length)
 
         self.encoder = nn.Sequential(
-            nn.Linear(self.emb_length * self.max_prompt_len, self.middle_dim),
+            nn.Linear(self.emb_length, self.middle_dim),
             nn.ReLU(),
             nn.Linear(self.middle_dim, self.middle_dim),
             nn.ReLU(),
