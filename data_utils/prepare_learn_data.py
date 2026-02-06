@@ -169,6 +169,9 @@ def process_single_midi(md5):
         for token in ids:
             # Когда новый такт
             if token == 4 and len(tact) > 1:
+                for instrument in tact:
+                    tact[instrument].append(2)
+
                 del tact['prepare']
                 tacts.append(tact.copy())
 
@@ -238,7 +241,7 @@ def parse_midi_tokens(md5_paths):
 
 def main():
     print("ЗАПУЩЕН ПРОЦЕСС ПРЕДПОДГОТОВКИ ДАННЫХ")
-    # all_md5, prompts_tags = get_captions_tags()
+    all_md5, prompts_tags = get_captions_tags()
 
     all_md5 = set()
     prompts_tags = []
@@ -250,24 +253,46 @@ def main():
             if i >= 70000:
                 break
 
-    # print("MIDI ПРОМПТ ТЕГИ ИНИЦИАЛИЗИРОВАНЫ!")
-    #
-    # init_alphabets()
-    # print("АЛФАВИТЫ СЛОВ и MIDI ТЭГОВ ИНИЦИАЛИЗИРОВАНЫ!")
-    #
-    # print("\nЗапущен процесс составления промптов!")
-    # midi_prompts = get_midi_prompt(prompts_tags)
-    # del prompts_tags
-    # print("ПРОМПТЫ СОСТАВЛЕНЫ!")
-    # save_prompts(midi_prompts)
-    # print("ПРОМПТЫ СОХРАНЕНЫ В ФАЙЛ!")
-    #
-    # all_md5_list = list(all_md5)[:70000]
-    # del midi_prompts
-    # del all_md5
+    print("MIDI ПРОМПТ ТЕГИ ИНИЦИАЛИЗИРОВАНЫ!")
+
+    init_alphabets()
+    print("АЛФАВИТЫ СЛОВ и MIDI ТЭГОВ ИНИЦИАЛИЗИРОВАНЫ!")
+
+    print("\nЗапущен процесс составления промптов!")
+    midi_prompts = get_midi_prompt(prompts_tags)
+    del prompts_tags
+    print("ПРОМПТЫ СОСТАВЛЕНЫ!")
+    save_prompts(midi_prompts)
+    print("ПРОМПТЫ СОХРАНЕНЫ В ФАЙЛ!")
+
+    all_md5_list = list(all_md5)[:70000]
+    del midi_prompts
+    del all_md5
     print("Запуск токенизации MIDI файлов!")
     parse_midi_tokens(all_md5)
     print("MIDI ФАЙЛЫ ТОКЕНИЗИРОВАННЫ!")
 
+
 if __name__ == "__main__":
     main()
+
+
+
+# buffer = []
+    # with open("../data/parsed_midi.jsonl", "r", encoding="utf-8") as f_read:
+    #     for i, line in enumerate(f_read):
+    #         parsed = json.loads(line)
+    #         md5 = parsed['md5']
+    #         tacts = parsed.get('tokens')
+    #         if tacts is not None:
+    #             for tact in tacts:
+    #                 for instrument in tact:
+    #                     tact[instrument].append(2)
+    #             buffer.append(json.dumps({'md5': md5, 'tacts': tacts}))
+    #             if i % 1000 == 0:
+    #                 print(i)
+    #         else:
+    #             print(parsed)
+    #
+    # with open("../data/parsed_midi.jsonl", "w", encoding="utf-8") as f_write:
+    #     f_write.write("\n".join(buffer))

@@ -28,11 +28,6 @@ class EncoderLinear(nn.Module):
         )
 
     def forward(self, x):
-        if x.size(1) < self.max_prompt_len:
-            pad = torch.zeros(x.size(0), self.max_prompt_len - x.size(1), dtype=torch.long, device=x.device)
-            x = torch.cat([x, pad], dim=1)
-        else:
-            x = x[:, :self.max_prompt_len]
         x = self.embeddings_layer(x)
         x = x.view(x.size(0), -1)
 
