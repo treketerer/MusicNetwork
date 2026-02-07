@@ -20,12 +20,11 @@
 
 **🔊 Пример генерации**
 <br>**Промпт: "Бах"**
-[data/git/prokofiev.mp3](https://github.com/treketerer/MusicNetwork/blob/main/data/git/Bach.mp3)
+[data/git/Bach.mp3](https://github.com/treketerer/MusicNetwork/blob/main/data/git/Bach.mp3)
 <br>**Промпт: "Прокофьев"**
-[data/git/Bach.mp3](https://github.com/treketerer/MusicNetwork/blob/main/data/git/prokofiev.mp3)
+[data/git/prokofiev.mp3](https://github.com/treketerer/MusicNetwork/blob/main/data/git/prokofiev.mp3)
 
 ---
-
 
 ## 🧠 Архитектура модели
 
@@ -67,11 +66,10 @@
 <br>или же
 <br>```python main.py```
 
-
 ---
 
 ### 📈 Обучение
-Модель была обучена на больших объемах данных через IterableDataset. Обучалась на 220+ тысячах midi файлов из [MAESTRO MIDI dataset]("https://magenta.tensorflow.org/datasets/maestro").
+Модель была обучена на больших объемах данных через IterableDataset. Обучалась на 220+ тысячах midi файлов из [Godzilla-Piano MIDI Dataset](https://huggingface.co/datasets/projectlosangeles/Godzilla-MIDI-Dataset).
 * **Loss Function**: CrossEntropyLoss.
 * **Optimizer**: Adam (LR: 0.0005).
 * **Batch Size**: 192.
