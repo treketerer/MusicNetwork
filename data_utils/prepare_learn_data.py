@@ -2,8 +2,6 @@ import json
 import random
 import os
 
-from IPython.terminal.shortcuts.auto_match import brackets
-
 from data.keywords import all_translations
 from metaparser import get_captions_tags
 from multiprocessing import cpu_count

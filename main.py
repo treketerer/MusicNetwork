@@ -10,7 +10,7 @@ import torch.optim as optim
 
 from core.music_nn import MusicNN
 from data_utils.dataset import MusicStreamingDataset
-from learn_logic import learn_model
+from learning import learn_model
 from use_logic import use_model
 
 from data.keywords import prompts_by_key

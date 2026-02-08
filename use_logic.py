@@ -26,7 +26,7 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
     print(f"Новый запрос:\nprompt: {prompt}\ntemperature: {temperature}\ntop_k: {top_k}\nduration: {duration}\noutput_count: {output_count}")
 
     if not prompt: return None
-    words_idx = dataset.words_to_idx(prompt.lower())
+    words_idx, instruments_idx = dataset.words_to_idx(prompt.lower())
     input_tensor = torch.tensor([words_idx], dtype=torch.long).to(DEVICE)
 
     outputs_tokens = []
@@ -77,7 +77,7 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
         print("Эффекты наложены!")
 
         words_idx = ["<unk>" if x == 0 else x for x in words_idx]
-        return_text = f"{prompt}\n{words_idx}"
+        return_text = f"{prompt}\nwords: {words_idx}\ninstruments: {instruments_idx}"
         return return_text, midi_path, mp3_path
     except Exception as e:
         print(f"Ошибка сохранения MIDI: {e}")
