@@ -28,30 +28,30 @@ class MusicNN(nn.Module):
         backloop_input_size = self.inner_context_size + self.midi_embeddings_size + self.instruments_counts
         self.backloop_encoder = BackloopLinearEncoder(backloop_input_size, backloop_input_size, int(backloop_input_size/2))
 
-    def learn_nn(self, prompt_idx, instruments_idx, all_tacts):
+    def learn_nn(self, prompt_idx, instruments_idx:list, all_tacts:dict):
+        # Прогон через Backloop для получения векторов в начало
+        tacts_values = torch.tensor(all_tacts.values())
+        tacts_hots = nn.functional.one_hot(tacts_values, num_classes=tacts_values.dim())
+        backloop_vectors = self.backloop_encoder(tacts_hots)
+
         instruments_vector = self.instruments_linear_parser(instruments_idx)
         vibe_vector = self.encoder_model(prompt_idx)
-        input_vector = torch.cat((vibe_vector, instruments_vector), dim=1)
+        instant_vector = torch.cat((vibe_vector, instruments_vector), dim=1)
 
-        first_vector = torch.cat((input_vector, torch.zeros(input_vector.size(-1))), dim = 1)
+        first_vector = torch.cat((instant_vector, torch.zeros(instant_vector.size(-1))), dim = 1)
+        other_vectors = torch.cat((instant_vector, backloop_vectors))
+        all_input_vectors = torch.cat((first_vector, other_vectors))
 
-        tacts_hots = torch.oneho
-        backloop_vectors = self.backloop_encoder(all_tacts)
-        final_vibes = torch.cat((first_vector, backloop_vectors))
-        repeated_inp = input_vector.repeat(input_vector.size(-1))
-        all_conductors_inp = torch.cat((repeated_inp, final_vibes))
-
-        conductor_h = self.conductor_lstm(all_conductors_inp)
+        conductor_h = self.conductor_lstm(all_input_vectors)
         instruments = self.instruments_linear_parser(conductor_h)
-
         instruments_conductor_vectors = self.instruments_embeddings.weight * instruments
 
         empty_note = torch.tensor([2])
         first_notes = all_tacts[:, :-1, :1]
         final_notes = torch.cat((empty_note, first_notes))
-        self.instruments_lstm(conductor_h, instruments_conductor_vectors, final_notes)
+        logits, hn, cn = self.instruments_lstm(conductor_h, instruments_conductor_vectors, final_notes)
 
-        return None
+        return logits
 
     def use_nn(self, prompt_idx, instruments_idx, last_notes, h0, c0):
         input_vector = None
