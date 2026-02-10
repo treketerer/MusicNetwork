@@ -23,64 +23,97 @@ class MusicNN(nn.Module):
 
         self.conductor_lstm = ConductorLSTM(self.inner_context_size, self.inner_context_size)
         self.instruments_linear_parser = InstrumentsMultiHotLinearParser(self.instruments_counts, self.inner_context_size, self.inner_context_size)
-        self.instruments_lstm = InstrumentsLSTM(self.inner_context_size, self.instruments_counts, self.midi_embeddings_size)
+        self.instruments_lstm = InstrumentsLSTM(self.inner_context_size, self.instruments_counts, self.instruments_embedding_size, self.midi_embeddings_size)
 
         backloop_input_size = self.inner_context_size + self.midi_embeddings_size + self.instruments_counts
         self.backloop_encoder = BackloopLinearEncoder(backloop_input_size, backloop_input_size, int(backloop_input_size/2))
 
-    def learn_nn(self, prompt_idx, instruments_idx:list, all_tacts:dict):
+    def learn_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, tacts_instr:torch.Tensor, tacts_data:torch.Tensor):
         # Прогон через Backloop для получения векторов в начало
-        tacts_values = torch.tensor(all_tacts.values())
-        tacts_hots = nn.functional.one_hot(tacts_values, num_classes=tacts_values.dim())
-        backloop_vectors = self.backloop_encoder(tacts_hots)
+        backloop_vectors = self.backloop_encoder(torch.sum(self.instruments_lstm.midi_embeddings(tacts_data)))
 
-        instruments_vector = self.instruments_linear_parser(instruments_idx)
+        # Получение половины вектора для инструментов
+        instruments_vector = self.instruments_linear_parser(full_instr_list)
         vibe_vector = self.encoder_model(prompt_idx)
-        instant_vector = torch.cat((vibe_vector, instruments_vector), dim=1)
+        constant_vector = torch.cat((vibe_vector, instruments_vector), dim=1)
+        f, s = constant_vector.shape
 
-        first_vector = torch.cat((instant_vector, torch.zeros(instant_vector.size(-1))), dim = 1)
-        other_vectors = torch.cat((instant_vector, backloop_vectors))
-        all_input_vectors = torch.cat((first_vector, other_vectors))
+        # Получение всех векторов для инструментов
+        zeros = torch.zeros_like(backloop_vectors[:, :1, :])
+        backloop_input = torch.cat((zeros, backloop_vectors[:, :-1, :]), dim=1)
+        all_input_vectors = torch.cat((constant_vector.expand(f, -1), backloop_input), dim = 1)
 
+        # Прогон через дирижера, получение предсказания инструментов
         conductor_h = self.conductor_lstm(all_input_vectors)
-        instruments = self.instruments_linear_parser(conductor_h)
-        instruments_conductor_vectors = self.instruments_embeddings.weight * instruments
+        instruments_logits = self.instruments_linear_parser(conductor_h)
 
-        empty_note = torch.tensor([2])
-        first_notes = all_tacts[:, :-1, :1]
-        final_notes = torch.cat((empty_note, first_notes))
-        logits, hn, cn = self.instruments_lstm(conductor_h, instruments_conductor_vectors, final_notes)
+        # Получение нот
+        instruments_conductor_vectors = self.instruments_embeddings(tacts_instr)
+        notes_logits, hn, cn = self.instruments_lstm(conductor_h, instruments_conductor_vectors, tacts_data)
 
-        return logits
+        return notes_logits, instruments_logits
 
-    def use_nn(self, prompt_idx, instruments_idx, last_notes, h0, c0):
-        input_vector = None
-        if self.backloop_vector is None:
-            instruments_vector = self.instruments_linear_parser(instruments_idx)
-            vibe_vector = self.encoder_model(prompt_idx)
-            input_vector = torch.cat((vibe_vector, instruments_vector), dim=1)
-            self.backloop_vector = input_vector
-        if last_notes is None:
-            dim = prompt_idx.size(-1)
-            midis_idx = [1] * dim
+    def use_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, backloop_vec = None, h0=None, c0=None, temperature=0.9, short_notes_coef=0.75, top_k=50):
+        tacts_data: torch.Tensor
 
-        answer, hn, cn = self.conductor_lstm(input_vector, h0, c0)
-        instruments_multi_hot = self.instruments_linear_parser(answer)
-        inst_weights = torch.sigmoid(instruments_multi_hot)
-        instruments_vectors = self.instruments_embeddings.weight * inst_weights.unsqueeze(-1)
+        # Получение половины вектора для инструментов
+        instruments_vector = self.instruments_linear_parser(full_instr_list)
+        vibe_vector = self.encoder_model(prompt_idx)
+        constant_vector = torch.cat((vibe_vector, instruments_vector), dim=1)
 
-        instruments_answer, hn, cn = self.instruments_lstm(answer, instruments_vectors, midis_idx)
-        backloop_vec = instruments_answer.sum(dim=1)
-        backloop_vec = torch.nn.functional.normalize(backloop_vec, dim=1)
-        self.backloop_vector = self.backloop_encoder(backloop_vec)
+        if backloop_vec is None:
+            backloop_vec = torch.zeros(constant_vector.size(-1))
 
-        return instruments_answer, hn, cn
+        # Получение всех векторов для инструментов
+        input_vector = torch.cat((constant_vector, backloop_vec))
+
+        # Прогон через дирижера, получение предсказания инструментов
+        conductor_h = self.conductor_lstm(input_vector)
+        instruments_logits = self.instruments_linear_parser(conductor_h)
+
+        # Получение нот
+        instruments_conductor_vectors = self.instruments_embeddings.weight * instruments_logits
+
+        output_tact_data = {}
+        tact_data = []
+
+        # Получаем самые вероятные инструменты
+        threshold = 0.35
+        active_mask = instruments_conductor_vectors > threshold
+        instruments_indices = torch.where(active_mask)[0]
+
+        for idx in instruments_indices:
+            tact_data.append([1])
+
+        for i in range(100):
+            notes_logits, hn, cn = self.instruments_lstm(conductor_h.unsqueeze(0), instruments_conductor_vectors.unsqueeze(0).unsqueeze(0), torch.tensor(tact_data).unsqueeze(0).unsqueeze(0))
+
+            for i, note_logits in enumerate(notes_logits):
+                next_token_logits = note_logits[0, -1, :] / temperature
+                next_token_logits[110:130] /= (2 - short_notes_coef)
+
+                next_token_logits = torch.nan_to_num(next_token_logits, nan=0.0, posinf=10.0, neginf=-10.0)
+
+                threshold = torch.topk(next_token_logits, top_k).values[-1]
+                next_token_logits[next_token_logits < threshold] = -float('Inf')
+
+                probs = torch.softmax(next_token_logits, dim=-1)
+                next_token = torch.multinomial(probs, num_samples=1)
+
+                if next_token == 2:
+                    output_tact_data[instruments_indices[i]] = tact_data[i]
+                    del tact_data[i]
+                else:
+                    tact_data[i].append(next_token)
+
+        backloop_vector = self.backloop_encoder(torch.sum(self.instruments_lstm.midi_embeddings(tact_data)))
+        return tact_data, backloop_vector
 
 
-    def forward(self, prompt_idx, instruments_idx, midis_idx, h0 = None, c0 = None):
+    def forward(self, prompt_idx:list, full_instr_list:torch.Tensor, tacts_instr:torch.Tensor = None, tacts_data:torch.Tensor = None, backloop_vec = None, h0 = None, c0 = None):
         if self.is_training:
-            learn = self.learn_nn(prompt_idx, instruments_idx, midis_idx)
-            return learn
+            tact_data, instruments_logits = self.learn_nn(prompt_idx, full_instr_list, tacts_instr, tacts_data)
+            return tact_data, instruments_logits
         else:
-            user = self.use_nn(prompt_idx, instruments_idx, midis_idx, h0, c0)
-            return user
+            tact_data, backloop_vector = self.use_nn(prompt_idx, full_instr_list, backloop_vec=backloop_vec, h0=h0, c0=c0)
+            return tact_data, backloop_vector

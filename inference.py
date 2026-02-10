@@ -19,45 +19,43 @@ tokenizer = REMI(config)
 print("Токенайзер инициализирован!")
 
 # Использование
-def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, temperature: float, top_k: int, duration: float, output_count: int, sound_font: str):
+def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, temperature: float, top_k: int, duration: float, output_tacts_count: int, sound_font: str):
     model.to(DEVICE)
     model.eval()
+    model.is_training = False
 
-    print(f"Новый запрос:\nprompt: {prompt}\ntemperature: {temperature}\ntop_k: {top_k}\nduration: {duration}\noutput_count: {output_count}")
+    print(f"Новый запрос:\nprompt: {prompt}\ntemperature: {temperature}\ntop_k: {top_k}\nduration: {duration}\noutput_count: {output_tacts_count}")
 
     if not prompt: return None
     words_idx, instruments_idx = dataset.words_to_idx(prompt.lower())
-    input_tensor = torch.tensor([words_idx], dtype=torch.long).to(DEVICE)
+    words_tensor = torch.tensor([words_idx], dtype=torch.long).to(DEVICE)
+    instruments_tensor = torch.tensor([instruments_idx], dtype=torch.long).to(DEVICE)
 
     outputs_tokens = []
     h, c = None, None
 
-    current_token = torch.tensor([[1]], dtype=torch.long).to(DEVICE)
+    tacts = []
 
     with torch.no_grad():
-        for _ in range(output_count):
-            logits, h, c = model(input_tensor, current_token, h, c)
-
-            next_token_logits = logits[0, -1, :] / temperature
-            next_token_logits[110:130] /= (2-duration)
-
-            next_token_logits = torch.nan_to_num(next_token_logits, nan=0.0, posinf=10.0, neginf=-10.0)
-            # next_token_logits = torch.clamp(next_token_logits, -20.0, 20.0)  # жёсткие границы
-
-            threshold = torch.topk(next_token_logits, top_k).values[-1]
-            next_token_logits[next_token_logits < threshold] = -float('Inf')
-
-            probs = torch.softmax(next_token_logits, dim=-1)
-            next_token = torch.multinomial(probs, num_samples=1)
-
-            token_val = next_token.item()
-            outputs_tokens.append(token_val)
-
-            # Обновляем current_token для следующего шага
-            current_token = next_token.unsqueeze(0)
+        backloop_vec = None
+        for _ in range(output_tacts_count):
+            tact_data, backloop_vec = model(words_tensor, instruments_tensor, backloop_vec=backloop_vec)
+            tacts.append(tact_data)
 
     try:
-        generated_sequence = tokenizer.decode(outputs_tokens)
+        united_midi_data = []
+
+        for tact in tacts:
+            for instrument in tact.keys():
+                inst = instrument
+                if inst == -1: inst = 128
+                united_midi_data.append(282+inst)
+
+                for item in tact[instrument].values():
+                    united_midi_data.append(item)
+
+
+        generated_sequence = tokenizer.decode(united_midi_data)
         file_name = str(uuid.uuid4()).replace('-', '')[:15]
         midi_path = f"./output/midi/{file_name}.mid"
         mp3_path = f"./output/mp3/{file_name}.mp3"

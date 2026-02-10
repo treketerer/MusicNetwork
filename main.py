@@ -11,7 +11,7 @@ import torch.optim as optim
 from core.music_nn import MusicNN
 from data_utils.dataset import MusicStreamingDataset
 from learning import learn_model
-from use_logic import use_model
+from inference import use_model
 
 from data.keywords import prompts_by_key
 
@@ -40,8 +40,8 @@ data_path = paths.get("local")
 model_input_path = paths.get("local_models")
 model_output_path = paths.get("local_models")
 
-NEED_TO_LEARN = False
-LOAD_LEARNED_MODEL = True
+NEED_TO_LEARN = True
+LOAD_LEARNED_MODEL = False
 SAVED_MODEL_PATH = f"{model_input_path}/piano_v1.0.pth"
 
 SOUND_FONT_PATH = "./data/soundfonts/FluidR3_GM.sf2"

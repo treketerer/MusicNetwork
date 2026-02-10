@@ -20,6 +20,7 @@ class MusicStreamingDataset(IterableDataset):
         self.words_alphabet_words = None
         self.midi_alphabet_idx = None
         self.midi_alphabet_midi = None
+        self.midi_alphabet_len = None
 
         self.max_buffer_len = buffer_size
 
@@ -39,6 +40,7 @@ class MusicStreamingDataset(IterableDataset):
             if len(lines) >= 2:
                 self.midi_alphabet_idx = json.loads(lines[0])
                 self.midi_alphabet_midi = json.loads(lines[1])
+                self.midi_alphabet_len = len(self.midi_alphabet_idx)
             else:
                 print("ФАЙЛ MIDI АЛФАВИТА ПУСТ!!!")
 
@@ -143,15 +145,17 @@ class MusicStreamingDataset(IterableDataset):
         if not batch: return None
 
         prompts = [item['idx_prompt'] for item in batch]
-        tacts = [item['tacts'] for item in batch]
+        tacts_instruments = [item['tacts_instruments'] for item in batch]
+        tacts_data = [item['tacts_data'] for item in batch]
         instruments = [item['instruments'] for item in batch]
 
         # Паддинг (заполняем нулями короткие последовательности)
         prompts_padded = pad_sequence(prompts, batch_first=True, padding_value=0)
-        tacts_padded = pad_sequence(tacts, batch_first=True, padding_value=0)
+        tacts_instruments_padded = pad_sequence(tacts_instruments, batch_first=True, padding_value=0)
+        tacts_data_padded = pad_sequence(tacts_data, batch_first=True, padding_value=0)
         instruments =  pad_sequence(instruments, batch_first=True, padding_value=0)
 
-        return {'idx_prompts': prompts_padded, 'tacts': tacts_padded, 'instruments': instruments}
+        return {'idx_prompts': prompts_padded, 'tacts_inst': tacts_instruments_padded, 'tacts_data': tacts_data_padded, 'instruments': instruments}
 
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
@@ -190,5 +194,6 @@ class MusicStreamingDataset(IterableDataset):
         res = data.copy()
         res['idx_prompt'] = torch.tensor(res['idx_prompt'], dtype=torch.long)
         res['instruments'] = torch.tensor(res['instruments'], dtype=torch.long)
-        res['tacts'] = torch.tensor(res.get('tacts'), dtype=torch.long)
+        res['tacts_instruments'] = torch.tensor([tact.keys() for tact in res.get('tacts')], dtype=torch.long)
+        res['tacts_data'] = torch.tensor([tact.values() for tact in res.get('tacts')], dtype=torch.long)
         return res

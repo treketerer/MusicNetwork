@@ -169,6 +169,7 @@ def process_single_midi(md5):
             if token == 4 and len(tact) > 1:
                 for instrument in tact:
                     tact[instrument].append(2)
+                    tact[instrument].insert(0, 1)
 
                 del tact['prepare']
                 tacts.append(tact.copy())

@@ -2,9 +2,12 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
+from core import MusicNN
+from data_utils import MusicStreamingDataset
+
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def learn_model(model: nn.Module, dataset: torch.utils.data.IterableDataset, loss_function, optimizer, epochs_count: int, batch_size: int, print_coef: int, model_output_path: str, save_model_id: int):
+def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, optimizer, epochs_count: int, batch_size: int, print_coef: int, model_output_path: str, save_model_id: int):
     # Обучение
     model.train()
     model.to(DEVICE)
@@ -13,30 +16,57 @@ def learn_model(model: nn.Module, dataset: torch.utils.data.IterableDataset, los
     epoch = 0
     current_loss = None
 
+    criterion_notes = nn.CrossEntropyLoss()
+    criterion_insts = nn.BCEWithLogitsLoss()
+
     try:
         for epoch in range(epochs_count):
             train_loader = DataLoader(
                 dataset,
                 batch_size=batch_size,
-                num_workers=2,  # <--- Задействуем 8 ядер для чтения и парсинга
-                persistent_workers=True,  # <--- Не убивать воркеры после эпохи (важно для Windows!)
-                prefetch_factor=10,  # <--- Каждый воркер заранее готовит по 2 батча
+                num_workers=2,  # <--- Задействуем 2 ядра для чтения и парсинга
+                persistent_workers=True,  # <--- Не убивать воркеры после эпохи
+                prefetch_factor=10,  # <--- Каждый воркер готовит 10 батчей
                 collate_fn=dataset.collate_fn,
-                pin_memory=True  # <--- Ускоряет передачу данных (особенно если есть GPU)
+                pin_memory=True  # <--- Ускоряет передачу данных
             )
 
             for i, batch in enumerate(train_loader):
                 optimizer.zero_grad()
 
                 prompts = batch.get('idx_prompts').to(DEVICE, non_blocking=True)
-                tokens = batch.get('tokens').to(DEVICE, non_blocking=True)
+                full_instruments = batch.get('instruments').to(DEVICE, non_blocking=True)
+                tacts_data = batch.get('tacts_data').to(DEVICE, non_blocking=True)
+                tacts_instruments = batch.get('tacts_instruments').to(DEVICE, non_blocking=True)
 
-                inp = tokens[:, :-1].to(DEVICE)
-                target = tokens[:, 1:].to(DEVICE)
+                inp_tdata = tacts_data.to(DEVICE)
+                target_tdata = tacts_data.to(DEVICE)
+                inp_inst = tacts_instruments.to(DEVICE)
+                target_inst = tacts_instruments.to(DEVICE)
 
-                logits, _, _ = model(prompts, inp, None, None)
+                tact_logits, instruments_logits = model(prompts, full_instruments, tacts_instr=inp_inst, tacts_data=inp_tdata)
+                """
+                tact_logits - (batch, tacts, notes, note_emb)
+                instruments_logits - (batch, tacts, instruments_multihot)
+                """
 
-                current_loss = loss_function(logits.reshape(-1, logits.size(-1)), target.reshape(-1))
+
+                loss_notes = criterion_notes(
+                    tact_logits[:, :, :-1, :].reshape(-1, dataset.midi_alphabet_len),
+                    target_tdata[:, :, 1:].reshape(-1)
+                )
+
+                target_inst_multihot = torch.zeros(target_inst[0], target_inst[1], 128)
+                target_inst_multihot.scatter_(2, target_inst, 1)
+
+                loss_inst = criterion_insts(
+                    instruments_logits.reshape(-1, 128),
+                    target_inst_multihot.reshape(-1, 128).float()
+                )
+
+                instrum_loss_coef = 0.5
+                current_loss = loss_notes + (instrum_loss_coef * loss_inst)
+
                 current_loss.backward()
                 nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optimizer.step()
