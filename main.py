@@ -13,18 +13,18 @@ from data_utils.dataset import MusicStreamingDataset
 from learning import learn_model
 from inference import use_model
 
-from data.keywords import prompts_by_key
+from data.keywords import all_translations
 
 # Исправление ошибки в Gradle ConnectionResetError: [WinError 10054] Удаленный
 import asyncio
 asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # CONFIGS
-BATCH_SIZE = 192
-LEARNING_RATE = 0.0005
-EPOCHS_COUNT = 5
-BUFFER_SIZE = 1500
-PRINT_COEF = 50
+BATCH_SIZE = 10
+LEARNING_RATE = 0.001
+EPOCHS_COUNT = 1
+BUFFER_SIZE = 10
+PRINT_COEF = 1
 
 paths = {
     "collab": "/content/data",
@@ -131,7 +131,7 @@ def main():
                         midi_out = gr.File(label='MIDI')
                         output_audio = gr.Audio(label="MP3")
             with gr.Tab(label="Алфавит"):
-                gr.Json(value=prompts_by_key)
+                gr.Json(value=all_translations)
 
             generate_button.click(
                 fn=gradio_use,
@@ -146,6 +146,6 @@ def gradio_use(prompt: str, temperature: float, top_k: int, duration: float, out
     return use_model(USE_MODEL, USE_DATASET, prompt, temperature, top_k, duration, output_count, SOUND_FONT_PATH)
 
 if __name__ == "__main__":
+    print("\nWORKER INITIALIZED")
     main()
 
-print("\nWORKER INITIALIZED")

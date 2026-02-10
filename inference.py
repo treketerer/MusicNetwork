@@ -19,27 +19,24 @@ tokenizer = REMI(config)
 print("Токенайзер инициализирован!")
 
 # Использование
-def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, temperature: float, top_k: int, duration: float, output_tacts_count: int, sound_font: str):
+def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, temperature: float, top_k: int, short_notes_coef: float, output_tacts_count: int, sound_font: str):
     model.to(DEVICE)
     model.eval()
     model.is_training = False
 
-    print(f"Новый запрос:\nprompt: {prompt}\ntemperature: {temperature}\ntop_k: {top_k}\nduration: {duration}\noutput_count: {output_tacts_count}")
+    print(f"Новый запрос:\nprompt: {prompt}\ntemperature: {temperature}\ntop_k: {top_k}\nshort_notes_coef: {short_notes_coef}\noutput_count: {output_tacts_count}")
 
     if not prompt: return None
     words_idx, instruments_idx = dataset.words_to_idx(prompt.lower())
     words_tensor = torch.tensor([words_idx], dtype=torch.long).to(DEVICE)
     instruments_tensor = torch.tensor([instruments_idx], dtype=torch.long).to(DEVICE)
 
-    outputs_tokens = []
-    h, c = None, None
-
     tacts = []
 
     with torch.no_grad():
         backloop_vec = None
         for _ in range(output_tacts_count):
-            tact_data, backloop_vec = model(words_tensor, instruments_tensor, backloop_vec=backloop_vec)
+            tact_data, backloop_vec = model(words_tensor, instruments_tensor, backloop_vec=backloop_vec, temperature=temperature, short_notes_coef=short_notes_coef, top_k=top_k)
             tacts.append(tact_data)
 
     try:

@@ -194,6 +194,21 @@ class MusicStreamingDataset(IterableDataset):
         res = data.copy()
         res['idx_prompt'] = torch.tensor(res['idx_prompt'], dtype=torch.long)
         res['instruments'] = torch.tensor(res['instruments'], dtype=torch.long)
-        res['tacts_instruments'] = torch.tensor([tact.keys() for tact in res.get('tacts')], dtype=torch.long)
-        res['tacts_data'] = torch.tensor([tact.values() for tact in res.get('tacts')], dtype=torch.long)
+
+        inst = [list(tact.keys()) for tact in res.get('tacts')]
+        num_tacts = len(tacts)
+
+        int_inst = []
+        max_len = 0
+
+        for tact in inst:
+            tact = []
+            for i, inst in enumerate(tact):
+                tact.append(int(inst))
+                if i > max_len:
+                    max_len = i
+            int_inst.append(tact)
+
+        res['tacts_instruments'] = torch.tensor(int_inst, dtype=torch.long)
+        res['tacts_data'] = torch.tensor([list(tact.values()) for tact in res.get('tacts')], dtype=torch.long)
         return res

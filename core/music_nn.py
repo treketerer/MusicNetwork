@@ -85,8 +85,10 @@ class MusicNN(nn.Module):
         for idx in instruments_indices:
             tact_data.append([1])
 
+        hn, cn = None, None
+
         for i in range(100):
-            notes_logits, hn, cn = self.instruments_lstm(conductor_h.unsqueeze(0), instruments_conductor_vectors.unsqueeze(0).unsqueeze(0), torch.tensor(tact_data).unsqueeze(0).unsqueeze(0))
+            notes_logits, hn, cn = self.instruments_lstm(conductor_h.unsqueeze(0), instruments_conductor_vectors.unsqueeze(0).unsqueeze(0), torch.tensor(tact_data).unsqueeze(0).unsqueeze(0), h0=hn, c0=cn)
 
             for i, note_logits in enumerate(notes_logits):
                 next_token_logits = note_logits[0, -1, :] / temperature
@@ -110,10 +112,10 @@ class MusicNN(nn.Module):
         return tact_data, backloop_vector
 
 
-    def forward(self, prompt_idx:list, full_instr_list:torch.Tensor, tacts_instr:torch.Tensor = None, tacts_data:torch.Tensor = None, backloop_vec = None, h0 = None, c0 = None):
+    def forward(self, prompt_idx:list, full_instr_list:torch.Tensor, tacts_instr:torch.Tensor = None, tacts_data:torch.Tensor = None, backloop_vec = None, h0 = None, c0 = None, temperature=0.9, short_notes_coef=0.75, top_k=50):
         if self.is_training:
             tact_data, instruments_logits = self.learn_nn(prompt_idx, full_instr_list, tacts_instr, tacts_data)
             return tact_data, instruments_logits
         else:
-            tact_data, backloop_vector = self.use_nn(prompt_idx, full_instr_list, backloop_vec=backloop_vec, h0=h0, c0=c0)
+            tact_data, backloop_vector = self.use_nn(prompt_idx, full_instr_list, backloop_vec=backloop_vec, h0=h0, c0=c0, temperature=temperature, short_notes_coef=short_notes_coef, top_k=top_k)
             return tact_data, backloop_vector

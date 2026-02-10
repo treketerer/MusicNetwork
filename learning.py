@@ -24,11 +24,11 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, o
             train_loader = DataLoader(
                 dataset,
                 batch_size=batch_size,
-                num_workers=2,  # <--- Задействуем 2 ядра для чтения и парсинга
+                num_workers=1,  # <--- Задействуем 2 ядра для чтения и парсинга
                 persistent_workers=True,  # <--- Не убивать воркеры после эпохи
-                prefetch_factor=10,  # <--- Каждый воркер готовит 10 батчей
+                prefetch_factor=1,  # <--- Каждый воркер готовит 10 батчей
                 collate_fn=dataset.collate_fn,
-                pin_memory=True  # <--- Ускоряет передачу данных
+                pin_memory=False  # <--- Ускоряет передачу данных
             )
 
             for i, batch in enumerate(train_loader):
@@ -49,7 +49,6 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, o
                 tact_logits - (batch, tacts, notes, note_emb)
                 instruments_logits - (batch, tacts, instruments_multihot)
                 """
-
 
                 loss_notes = criterion_notes(
                     tact_logits[:, :, :-1, :].reshape(-1, dataset.midi_alphabet_len),
