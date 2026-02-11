@@ -195,20 +195,31 @@ class MusicStreamingDataset(IterableDataset):
         res['idx_prompt'] = torch.tensor(res['idx_prompt'], dtype=torch.long)
         res['instruments'] = torch.tensor(res['instruments'], dtype=torch.long)
 
-        inst = [list(tact.keys()) for tact in res.get('tacts')]
-        num_tacts = len(tacts)
+        max_instruments = 0
+        max_data = 0
 
-        int_inst = []
-        max_len = 0
+        tacts = res.get('tacts')
+        tacts_len = len(tacts)
 
-        for tact in inst:
-            tact = []
-            for i, inst in enumerate(tact):
-                tact.append(int(inst))
-                if i > max_len:
-                    max_len = i
-            int_inst.append(tact)
+        for tact in tacts:
+            for k_idx, key in enumerate(list(tact.keys())):
+                if max_instruments < k_idx + 1:
+                    max_instruments = k_idx + 1
+                for n_key, note in enumerate(tact[key]):
+                    if max_data < n_key + 1:
+                        max_data = n_key + 1
 
-        res['tacts_instruments'] = torch.tensor(int_inst, dtype=torch.long)
-        res['tacts_data'] = torch.tensor([list(tact.values()) for tact in res.get('tacts')], dtype=torch.long)
+        tacts_instruments = torch.zeros((tacts_len, max_instruments), dtype=torch.long)
+        tacts_data = torch.zeros((tacts_len, max_instruments, max_data), dtype=torch.long)
+
+        for tact_idx, tact in enumerate(res.get('tacts')):
+            for k_idx, key in enumerate(list(tact.keys())):
+                int_key = int(key)
+                tacts_instruments[tact_idx, k_idx] = int_key
+
+                for n_key, note in enumerate(tact[key]):
+                    tacts_data[tact_idx, k_idx, n_key] = tact[key][n_key]
+
+        res['tacts_instruments'] = tacts_instruments
+        res['tacts_data'] = tacts_data
         return res
