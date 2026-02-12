@@ -17,20 +17,23 @@ class MusicNN(nn.Module):
         self.midi_embeddings_size = 512
         self.inner_context_size = 1024
 
+        backloop_output_size = int(self.midi_embeddings_size / 2)
+
         self.instruments_embeddings = nn.Embedding(self.instruments_counts, self.instruments_embedding_size)
 
         self.encoder_model = EncoderLinear(self.inner_context_size, text_alphabet_size)
 
-        self.conductor_lstm = ConductorLSTM(self.inner_context_size, self.inner_context_size)
-        self.instruments_linear_parser = InstrumentsMultiHotLinearParser(self.instruments_counts, self.inner_context_size, self.inner_context_size)
-        self.instruments_lstm = InstrumentsLSTM(self.inner_context_size, self.instruments_counts, self.instruments_embedding_size, self.midi_embeddings_size)
+        conductor_input_size = self.inner_context_size + self.inner_context_size + backloop_output_size
+        self.conductor_lstm = ConductorLSTM(conductor_input_size, self.inner_context_size)
+        self.instruments_linear_parser = InstrumentsMultiHotLinearParser(self.instruments_counts + 1, self.inner_context_size, self.inner_context_size)
+        self.instruments_lstm = InstrumentsLSTM(self.inner_context_size, self.instruments_counts, self.midi_embeddings_size)
 
-        backloop_input_size = self.inner_context_size + self.midi_embeddings_size + self.instruments_counts
-        self.backloop_encoder = BackloopLinearEncoder(backloop_input_size, backloop_input_size, int(backloop_input_size/2))
+        self.backloop_encoder = BackloopLinearEncoder(self.inner_context_size, self.inner_context_size, backloop_output_size)
 
     def learn_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, tacts_instr:torch.Tensor, tacts_data:torch.Tensor):
         # Прогон через Backloop для получения векторов в начало
-        backloop_vectors = self.backloop_encoder(torch.sum(self.instruments_lstm.midi_embeddings(tacts_data)))
+        inst_embs = self.instruments_lstm.midi_embeddings(tacts_data)
+        backloop_vectors = self.backloop_encoder(inst_embs.sum(dim=(2, 3)))
 
         # Получение половины вектора для инструментов
         instruments_vector = self.instruments_linear_parser(full_instr_list)
@@ -41,7 +44,9 @@ class MusicNN(nn.Module):
         # Получение всех векторов для инструментов
         zeros = torch.zeros_like(backloop_vectors[:, :1, :])
         backloop_input = torch.cat((zeros, backloop_vectors[:, :-1, :]), dim=1)
-        all_input_vectors = torch.cat((constant_vector.expand(f, -1), backloop_input), dim = 1)
+
+        constant_vector_expanded = constant_vector.unsqueeze(1).expand(-1, backloop_vectors.shape[1], -1)
+        all_input_vectors = torch.cat((constant_vector_expanded, backloop_input), dim=2)
 
         # Прогон через дирижера, получение предсказания инструментов
         conductor_h = self.conductor_lstm(all_input_vectors)

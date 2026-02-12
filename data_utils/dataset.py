@@ -8,13 +8,10 @@ import json
 
 from data.keywords import ban_list, all_translations, all_instruments
 
-
 class MusicStreamingDataset(IterableDataset):
     def __init__(self, parsed_midi_path, word_prompts_path, idx_prompts_path, words_alphabet_path, midi_alphabet_path,
                  buffer_size=1000):
         self.parsed_midi_path = parsed_midi_path
-
-        self.tracks_metadata = {}
 
         self.words_alphabet_idx = None
         self.words_alphabet_words = None
@@ -43,23 +40,6 @@ class MusicStreamingDataset(IterableDataset):
                 self.midi_alphabet_len = len(self.midi_alphabet_idx)
             else:
                 print("ФАЙЛ MIDI АЛФАВИТА ПУСТ!!!")
-
-        with open(word_prompts_path, 'r', encoding='utf-8') as f_words, \
-                open(idx_prompts_path, 'r', encoding='utf-8') as f_idx:
-            for word_line, idx_line in zip(f_words, f_idx):
-                # words_data = json.loads(word_line)
-                idx_data = json.loads(idx_line)
-
-                # now_words_md5 = words_data.get('md5')
-                # if now_words_md5 not in self.tracks_metadata:
-                #     self.tracks_metadata[now_words_md5] = {'md5': now_words_md5}
-                # self.tracks_metadata[now_words_md5]['words_prompt'] = words_data.get('prompt_keys')
-
-                now_idx_md5 = idx_data.get('md5')
-                if now_idx_md5 not in self.tracks_metadata:
-                    self.tracks_metadata[now_idx_md5] = {'md5': now_idx_md5}
-                self.tracks_metadata[now_idx_md5]['idx_prompt'] = idx_data.get('prompt_keys')
-                self.tracks_metadata[now_idx_md5]['instruments'] = idx_data.get('instruments')
 
     def get_words_alphabet_len(self):
         return len(self.words_alphabet_words)
@@ -124,20 +104,6 @@ class MusicStreamingDataset(IterableDataset):
                 answer.append(self.words_alphabet_idx.get(idx))
         return answer
 
-    def parse_line(self, line):
-        parsed = json.loads(line)
-        md5 = parsed.get("md5")
-        tokens = parsed.get('tacts')
-
-        MAX_SEQ_LEN = 756
-        if len(tokens) > MAX_SEQ_LEN:
-            tokens = tokens[:MAX_SEQ_LEN]
-
-        basedata = self.tracks_metadata.get(md5)
-
-        if basedata:
-            return {**basedata, 'tacts': tokens}
-        return None
 
     def collate_fn(self, batch):
         # Фильтруем None (битые данные)
@@ -145,17 +111,41 @@ class MusicStreamingDataset(IterableDataset):
         if not batch: return None
 
         prompts = [item['idx_prompt'] for item in batch]
-        tacts_instruments = [item['tacts_instruments'] for item in batch]
-        tacts_data = [item['tacts_data'] for item in batch]
         instruments = [item['instruments'] for item in batch]
+
+        # [batch, tact, instruments]
+        tacts_instruments = [item['tacts_instruments'] for item in batch]
+        # [batch, tact, instruments, notes]
+        tacts_data = [item['tacts_data'] for item in batch]
+
+        batch_size = len(batch)
+        max_tacts = 0
+        max_inst = 0
+        max_notes = 0
+
+        for item in batch:
+            t_len, i_len = item['tacts_instruments'].shape
+            n_len = item['tacts_data'].shape[2]
+
+            max_tacts = max(max_tacts, t_len)
+            max_inst = max(max_inst, i_len)
+            max_notes = max(max_notes, n_len)
+
+        tacts_instruments_padded = torch.zeros((batch_size, max_tacts, max_inst), dtype=torch.long)
+        tacts_data_padded = torch.zeros((batch_size, max_tacts, max_inst, max_notes), dtype=torch.long)
+
+        for i, item in enumerate(batch):
+            t_len, i_len = item['tacts_instruments'].shape
+            n_len = item['tacts_data'].shape[2]
+
+            tacts_instruments_padded[i, :t_len, :i_len] = item['tacts_instruments']
+            tacts_data_padded[i, :t_len, :i_len, :n_len] = item['tacts_data']
 
         # Паддинг (заполняем нулями короткие последовательности)
         prompts_padded = pad_sequence(prompts, batch_first=True, padding_value=0)
-        tacts_instruments_padded = pad_sequence(tacts_instruments, batch_first=True, padding_value=0)
-        tacts_data_padded = pad_sequence(tacts_data, batch_first=True, padding_value=0)
         instruments =  pad_sequence(instruments, batch_first=True, padding_value=0)
 
-        return {'idx_prompts': prompts_padded, 'tacts_inst': tacts_instruments_padded, 'tacts_data': tacts_data_padded, 'instruments': instruments}
+        return {'idx_prompts': prompts_padded, 'tacts_instruments': tacts_instruments_padded, 'tacts_data': tacts_data_padded, 'instruments': instruments}
 
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
@@ -174,20 +164,19 @@ class MusicStreamingDataset(IterableDataset):
                 if i % num_workers != worker_id:
                     continue
 
-                try:
-                    parsed_data = self.parse_line(line)
-                except:
-                    continue
+                track_data = json.loads(line)
 
                 if len(buffer) < self.max_buffer_len:
-                    buffer.append(parsed_data)
+                    buffer.append(track_data)
                 else:
                     random_idx = random.randrange(0, self.max_buffer_len)
+                    if buffer[random_idx] is None: continue
                     yield self.parse_data_tensors(buffer[random_idx])
-                    buffer[random_idx] = parsed_data
+                    buffer[random_idx] = track_data
 
             random.shuffle(buffer)
             for item in buffer:
+                if item is None: continue
                 yield self.parse_data_tensors(item)
 
     def parse_data_tensors(self, data):

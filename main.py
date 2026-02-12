@@ -111,15 +111,13 @@ def main():
         USE_DATASET = dataset
 
         gradio = get_gradio_ui(gradio_use)
-        gradio.launch(share=True)
+        gradio.launch(share=False)
 
 def gradio_use(prompt: str, temperature: float, top_k: int, duration: float, output_count: int):
     print("Генераци через Gradio")
     return use_model(USE_MODEL, USE_DATASET, prompt, temperature, top_k, duration, output_count, SOUND_FONT_PATH)
 
 if __name__ == "__main__":
-    gradio = get_gradio_ui(gradio_use)
-    gradio.launch(share=False)
-    # print("\nWORKER INITIALIZED")
-    # main()
+    print("\nWORKER INITIALIZED")
+    main()
 

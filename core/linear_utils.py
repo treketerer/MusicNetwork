@@ -14,8 +14,9 @@ class InstrumentsMultiHotLinearParser(nn.Module):
         )
 
     def forward(self, instruments_idx):
-        zeros = torch.zeros(self.input_dim)
-        multi_hot = zeros.scatter_(0, instruments_idx, 1)
+        batch_size = instruments_idx.size(0)
+        zeros = torch.zeros(batch_size, self.input_dim, device=instruments_idx.device)
+        multi_hot = zeros.scatter_(1, instruments_idx, 1.0)
         x = self.parser(multi_hot)
         return x
 
