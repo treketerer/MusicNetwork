@@ -16,7 +16,7 @@ class InstrumentsLSTM(nn.Module):
         self.hidden_state = self.input_size
         self.layer_dim = 3
         self.lstm = nn.LSTM(
-            input_size=self.hidden_state,
+            input_size=self.input_size,
             hidden_size=self.hidden_state,
             num_layers=self.layer_dim,
             batch_first=True,

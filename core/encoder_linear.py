@@ -3,27 +3,18 @@ import torch.nn as nn
 from torch import tensor
 
 class EncoderLinear(nn.Module):
-    def __init__(self, inner_context_size: int, alphabet_size: int):
+    def __init__(self, text_emb_length:int, inner_context_size: int, output_dim: int, alphabet_size: int):
         super(EncoderLinear, self).__init__()
 
-        self.alphabet_emb = None
-        self.alphabet_words = None
-
-        self.middle_dim = 1024
-        self.emb_length = 512
-        self.output_length = inner_context_size
-
-        self.alphabet_size = alphabet_size
-
-        self.embeddings_layer = nn.Embedding(num_embeddings=self.alphabet_size, embedding_dim=self.emb_length)
+        self.embeddings_layer = nn.Embedding(num_embeddings=alphabet_size, embedding_dim=text_emb_length)
 
         self.encoder = nn.Sequential(
-            nn.Linear(self.emb_length, self.middle_dim),
+            nn.Linear(text_emb_length, inner_context_size),
             nn.ReLU(),
-            nn.Linear(self.middle_dim, self.middle_dim),
+            nn.Linear(inner_context_size, inner_context_size),
             nn.ReLU(),
-            nn.LayerNorm(self.middle_dim),
-            nn.Linear(self.middle_dim, self.output_length),
+            nn.LayerNorm(inner_context_size),
+            nn.Linear(inner_context_size, output_dim),
         )
 
     def forward(self, x):

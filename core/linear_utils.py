@@ -21,7 +21,7 @@ class InstrumentsMultiHotLinearParser(nn.Module):
         return x
 
 class ConductorInstrumentsParser(nn.Module):
-    def __init__(self, instruments_count:int, h_dim: int, inner_dim: int, output_dim: int):
+    def __init__(self, h_dim: int, inner_dim: int, instruments_count:int):
         super(ConductorInstrumentsParser, self).__init__()
 
         self.instruments_count = instruments_count
@@ -29,7 +29,7 @@ class ConductorInstrumentsParser(nn.Module):
             nn.Linear(h_dim, inner_dim),
             nn.Sigmoid(),
             nn.LayerNorm(inner_dim),
-            nn.Linear(inner_dim, output_dim),
+            nn.Linear(inner_dim, self.instruments_count),
             nn.Sigmoid(),
             nn.Threshold(0.3, 1)
         )
