@@ -33,13 +33,19 @@ class InstrumentsLSTM(nn.Module):
         """
 
         bd, tb, ib, nb = tacts_notes.shape
-
+        print("In SHAPE", bd, tb, ib, nb)
         notes_vec = self.midi_embeddings(tacts_notes)
+        print("NV", notes_vec.shape)
         cond_vec = conductor_context.unsqueeze(2).unsqueeze(3).expand(bd, tb, ib, nb, -1)
-        inst_vec = instruments_emb.expand(nb, 2).expand(bd, tb, ib, nb, -1)
+        print("cond_vec", cond_vec.shape)
+        print("inst_vec", instruments_emb.shape)
+        inst_vec = instruments_emb.unsqueeze(3).expand(bd, tb, ib, nb, -1)
+        print("inst_vec", inst_vec.shape)
 
         input_vec = torch.cat([cond_vec, inst_vec, notes_vec], dim=-1)
+        print("input_vec", input_vec.shape)
         input_flat = input_vec.view(bd * tb * ib, nb, -1)
+        print("input_flat", input_flat.shape)
 
         if h0 is None and c0 is None:
             h0 = torch.zeros(self.layer_dim, bd * tb * ib, self.hidden_state).to(device)

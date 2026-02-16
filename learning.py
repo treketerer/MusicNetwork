@@ -51,17 +51,20 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, o
                 """
 
                 loss_notes = criterion_notes(
-                    tact_logits[:, :, :-1, :].reshape(-1, dataset.midi_alphabet_len),
-                    target_tdata[:, :, 1:].reshape(-1)
+                    tact_logits[:, :, :, :-1, :].reshape(-1, dataset.midi_alphabet_len),
+                    target_tdata[:, :, :, 1:].reshape(-1)
                 )
+                print("Loss notes")
 
-                target_inst_multihot = torch.zeros(target_inst[0], target_inst[1], 128)
+                target_inst_multihot = torch.zeros(target_inst.shape[0], target_inst.shape[1], 128, device=DEVICE)
                 target_inst_multihot.scatter_(2, target_inst, 1)
+                print("target_inst_multihot")
 
                 loss_inst = criterion_insts(
                     instruments_logits.reshape(-1, 128),
                     target_inst_multihot.reshape(-1, 128).float()
                 )
+                print("loss_inst")
 
                 instrum_loss_coef = 0.5
                 current_loss = loss_notes + (instrum_loss_coef * loss_inst)

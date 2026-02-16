@@ -28,17 +28,15 @@ class ConductorInstrumentsParser(nn.Module):
         self.instruments_count = instruments_count
         self.parser = nn.Sequential(
             nn.Linear(h_dim, inner_dim),
-            nn.Sigmoid(),
+            nn.ReLU(),
             nn.LayerNorm(inner_dim),
             nn.Linear(inner_dim, self.instruments_count),
-            nn.Sigmoid(),
-            nn.Threshold(0.3, 1)
+            nn.Sigmoid()
         )
 
     def forward(self, conductor_h):
         x = self.parser(conductor_h)
-        multi_hot = torch.zeros(self.instruments_count).scatter_(0, x, 1)
-        return multi_hot
+        return x
     
 class BackloopLinearEncoder(nn.Module):
     def __init__(self, input_dim: int, inner_dim: int, output_dim: int):

@@ -22,9 +22,9 @@ class ConductorLSTM(nn.Module):
 
     def forward(self, input_vector, h0=None, c0=None):
         if h0 is None and c0 is None:
-            h0 = input_vector.repeat(self.layer_dim, 1, 1).contiguous()
-            c0 = input_vector.repeat(self.layer_dim, 1, 1).contiguous()
+            out, (hn, cn) = self.lstm(input_vector)
+        else:
+            out, (hn, cn) = self.lstm(input_vector, (h0, c0))
 
-        out, (hn, cn) = self.lstm(input_vector, (h0, c0))
         logits = self.linear(out)
         return logits, hn, cn

@@ -22,7 +22,5 @@ class EncoderLinear(nn.Module):
 
     def forward(self, x):
         x = self.embeddings_layer(x)
-        x = x.view(x.size(0), -1)
-
         x = self.encoder(x)
         return x

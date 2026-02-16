@@ -20,10 +20,10 @@ import asyncio
 asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # CONFIGS
-BATCH_SIZE = 10
+BATCH_SIZE = 2
 LEARNING_RATE = 0.001
 EPOCHS_COUNT = 1
-BUFFER_SIZE = 10
+BUFFER_SIZE = 3
 PRINT_COEF = 1
 
 paths = {
