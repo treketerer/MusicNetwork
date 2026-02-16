@@ -1,10 +1,12 @@
 import torch
 import torch.nn as nn
+from torch.nn import Embedding
 
-class InstrumentsMultiHotLinearParser(nn.Module):
-    def __init__(self, input_dim: int, inner_dim: int, output_dim: int):
-        super(InstrumentsMultiHotLinearParser, self).__init__()
+class SongInstrumentsLinearParser(nn.Module):
+    def __init__(self, input_dim: int, inner_dim: int, output_dim: int, instruments_embeddings: Embedding):
+        super(SongInstrumentsLinearParser, self).__init__()
 
+        self.instruments_embeddings = instruments_embeddings
         self.input_dim = input_dim
         self.parser = nn.Sequential(
             nn.Linear(input_dim, inner_dim),
@@ -14,10 +16,9 @@ class InstrumentsMultiHotLinearParser(nn.Module):
         )
 
     def forward(self, instruments_idx):
-        batch_size = instruments_idx.size(0)
-        zeros = torch.zeros(batch_size, self.input_dim, device=instruments_idx.device)
-        multi_hot = zeros.scatter_(1, instruments_idx, 1.0)
-        x = self.parser(multi_hot)
+        instruments_emb = self.instruments_embeddings(instruments_idx)
+        print("DIM", instruments_emb.shape)
+        x = self.parser(instruments_emb)#.sum(dim=2))
         return x
 
 class ConductorInstrumentsParser(nn.Module):
@@ -50,6 +51,6 @@ class BackloopLinearEncoder(nn.Module):
             nn.Linear(inner_dim, output_dim)
         )
 
-    def forward(self, sums_h):
-        x = self.parser(sums_h)
-        return x
+    def forward(self, notes_sum_emb):
+        x = self.parser(notes_sum_emb)
+        return x.sum(2)

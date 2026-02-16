@@ -3,13 +3,16 @@ import torch.nn as nn
 from torch import tensor
 
 class EncoderLinear(nn.Module):
-    def __init__(self, text_emb_length:int, inner_context_size: int, output_dim: int, alphabet_size: int):
+    def __init__(self, alphabet_size: int, text_emb_dim:int, inner_context_size: int, output_dim: int):
         super(EncoderLinear, self).__init__()
 
-        self.embeddings_layer = nn.Embedding(num_embeddings=alphabet_size, embedding_dim=text_emb_length)
+        self.embeddings_layer = nn.Embedding(
+            alphabet_size,
+            text_emb_dim
+        )
 
         self.encoder = nn.Sequential(
-            nn.Linear(text_emb_length, inner_context_size),
+            nn.Linear(text_emb_dim, inner_context_size),
             nn.ReLU(),
             nn.Linear(inner_context_size, inner_context_size),
             nn.ReLU(),

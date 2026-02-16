@@ -181,8 +181,8 @@ def process_single_midi(md5):
             if token >= start_programs_token:
                 now_instrument_id = token - start_programs_token
                 print(now_instrument_id)
-                if now_instrument_id == 128:
-                    now_instrument_id = -1
+                # if now_instrument_id == 128: лишнее, вызывает ошибку
+                #     now_instrument_id = -1
 
                 if now_instrument_id not in tact:
                     tact[now_instrument_id] = (tact['prepare']).copy()
