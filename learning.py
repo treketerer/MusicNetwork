@@ -46,8 +46,8 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, o
 
                 tact_logits, instruments_logits = model(prompts, full_instruments, tacts_instr=inp_inst, tacts_data=inp_tdata)
                 """
-                tact_logits - (batch, tacts, notes, note_emb)
-                instruments_logits - (batch, tacts, instruments_multihot)
+                tact_logits - (batch, songs, tacts, notes, note_emb)
+                instruments_logits - (batch, song, tacts, instruments_probability)
                 """
 
                 loss_notes = criterion_notes(
@@ -56,13 +56,13 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, o
                 )
                 print("Loss notes")
 
-                target_inst_multihot = torch.zeros(target_inst.shape[0], target_inst.shape[1], 128, device=DEVICE)
+                target_inst_multihot = torch.zeros(target_inst.shape[0], target_inst.shape[1], 129, device=DEVICE)
                 target_inst_multihot.scatter_(2, target_inst, 1)
                 print("target_inst_multihot")
 
                 loss_inst = criterion_insts(
-                    instruments_logits.reshape(-1, 128),
-                    target_inst_multihot.reshape(-1, 128).float()
+                    instruments_logits.reshape(-1, 129),
+                    target_inst_multihot.reshape(-1, 129).float()
                 )
                 print("loss_inst")
 
@@ -73,7 +73,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, o
                 nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optimizer.step()
 
-                if (i + 1) % print_coef == 0 or i == 0:
+                if (i + 1) % print_coef == 0:
                     print(f'Epoch {epoch} Iteration {i + 1}, Loss: {current_loss.item():.4f}')
 
             print(f"Эпоха {epoch} завершена!")

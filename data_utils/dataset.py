@@ -9,8 +9,10 @@ import json
 from data.keywords import ban_list, all_translations, all_instruments
 
 class MusicStreamingDataset(IterableDataset):
-    def __init__(self, parsed_midi_path, word_prompts_path, idx_prompts_path, words_alphabet_path, midi_alphabet_path,
-                 buffer_size=1000):
+    def __init__(self, parsed_midi_path, words_alphabet_path, midi_alphabet_path,
+                 buffer_size=1000, max_tacts=100):
+
+        self.max_tacts = max_tacts
         self.parsed_midi_path = parsed_midi_path
 
         self.words_alphabet_idx = None
@@ -113,18 +115,15 @@ class MusicStreamingDataset(IterableDataset):
         prompts = [item['idx_prompt'] for item in batch]
         instruments = [item['instruments'] for item in batch]
 
-        # [batch, tact, instruments]
-        tacts_instruments = [item['tacts_instruments'] for item in batch]
-        # [batch, tact, instruments, notes]
-        tacts_data = [item['tacts_data'] for item in batch]
-
         batch_size = len(batch)
         max_tacts = 0
         max_inst = 0
         max_notes = 0
 
         for item in batch:
+            # [batch, tact, instruments]
             t_len, i_len = item['tacts_instruments'].shape
+            # [batch, tact, instruments, notes]
             n_len = item['tacts_data'].shape[2]
 
             max_tacts = max(max_tacts, t_len)
@@ -188,6 +187,10 @@ class MusicStreamingDataset(IterableDataset):
         max_data = 0
 
         tacts = res.get('tacts')
+
+        if len(tacts) > self.max_tacts:
+            tacts = tacts[:self.max_tacts]
+
         tacts_len = len(tacts)
 
         for tact in tacts:
@@ -201,7 +204,7 @@ class MusicStreamingDataset(IterableDataset):
         tacts_instruments = torch.zeros((tacts_len, max_instruments), dtype=torch.long)
         tacts_data = torch.zeros((tacts_len, max_instruments, max_data), dtype=torch.long)
 
-        for tact_idx, tact in enumerate(res.get('tacts')):
+        for tact_idx, tact in enumerate(tacts):
             for k_idx, key in enumerate(list(tact.keys())):
                 int_key = int(key)
                 tacts_instruments[tact_idx, k_idx] = int_key

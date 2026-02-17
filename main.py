@@ -61,15 +61,13 @@ def main():
 
     dataset = MusicStreamingDataset(
         f"{data_path}/parsed_midi.jsonl",
-        f"{data_path}/midi_words_prompts.jsonl",
-        f"{data_path}/midi_idx_prompts.jsonl",
         f"{data_path}/words_alphabet.jsonl",
         f"{data_path}/midi_alphabet.jsonl",
         buffer_size=BUFFER_SIZE
     )
     print("Датасет инициализирован!")
 
-    music_model = MusicNN(dataset.get_words_alphabet_len(), dataset.get_midi_alphabet_len())
+    music_model = MusicNN(dataset.get_words_alphabet_len(), dataset.get_midi_alphabet_len(), 129)
     print("Модель инициализирована!")
 
     optimizer = optim.Adam(music_model.parameters(), lr=LEARNING_RATE)

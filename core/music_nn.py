@@ -7,7 +7,7 @@ from .instruments_lstm import InstrumentsLSTM
 from .linear_utils import *
 
 class MusicNN(nn.Module):
-    def __init__(self, text_alphabet_size, instruments_counts = 128, learning=True):
+    def __init__(self, text_alphabet_size:int, midi_alphabet_size:int, instruments_counts = 129, learning=True):
         super(MusicNN, self).__init__()
 
         self.is_training = learning
@@ -17,7 +17,7 @@ class MusicNN(nn.Module):
         self.midi_embeddings_size = 512
         self.instruments_embedding_size = 512
 
-        self.inner_context_size = 1024
+        self.inner_context_size = 512
         self.backloop_output_size = self.inner_context_size
 
         self.instruments_embeddings = nn.Embedding(
@@ -54,7 +54,7 @@ class MusicNN(nn.Module):
         self.instruments_lstm_input_size = self.inner_context_size + self.instruments_embedding_size + self.midi_embeddings_size
         self.instruments_lstm = InstrumentsLSTM(
             self.instruments_lstm_input_size,
-            self.instruments_counts,
+            midi_alphabet_size,
             self.midi_embeddings_size
         )
 

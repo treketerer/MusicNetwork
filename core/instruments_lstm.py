@@ -5,12 +5,11 @@ from torch import tensor
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class InstrumentsLSTM(nn.Module):
-    def __init__(self, input_size: int, instruments_count: int, midi_emb_size: int):
+    def __init__(self, input_size: int, midi_alphabet_size: int, midi_emb_dim: int):
         super(InstrumentsLSTM, self).__init__()
 
-        self.instruments_count = instruments_count
-
-        self.midi_embeddings = nn.Embedding(self.instruments_count, midi_emb_size)
+        print(midi_alphabet_size, midi_emb_dim)
+        self.midi_embeddings = nn.Embedding(midi_alphabet_size, midi_emb_dim)
 
         self.input_size = input_size
         self.hidden_state = self.input_size
@@ -23,7 +22,7 @@ class InstrumentsLSTM(nn.Module):
             dropout=0.2
         )
 
-        self.midi_out = nn.Linear(self.hidden_state, self.hidden_state)
+        self.midi_out = nn.Linear(self.hidden_state, midi_alphabet_size)
 
     def forward(self, conductor_context: torch.Tensor, instruments_emb: torch.Tensor, tacts_notes: torch.Tensor, h0=None, c0=None):
         """
