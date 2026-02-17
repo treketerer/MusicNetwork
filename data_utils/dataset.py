@@ -87,12 +87,11 @@ class MusicStreamingDataset(IterableDataset):
         return words_idx, instruments_idx
 
     def parse_instruments(self, input_words: str) -> tuple[list, str]:
-        input_words = re.sub(r'[^\w\s-]', '', input_words)
+        input_words = re.sub(r'[^\w\s]', '', input_words).strip()
         instruments_arr = []
 
-        for key in all_translations.keys()[:129]:
+        for i, key in enumerate(list(all_translations.keys())[:128]):
             find = False
-
             if key in input_words:
                 input_words = input_words.replace(key, '')
                 find = True
@@ -101,10 +100,9 @@ class MusicStreamingDataset(IterableDataset):
                 if name in input_words:
                     input_words = input_words.replace(name, '')
                     find = True
-
-            if find and key in self.reverse_all_instruments:
-                instruments_arr.append(self.reverse_all_instruments[key])
-
+                    break
+            if find:
+                instruments_arr.append(i)
         return instruments_arr, input_words
 
 

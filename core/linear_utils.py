@@ -50,4 +50,5 @@ class BackloopLinearEncoder(nn.Module):
 
     def forward(self, notes_sum_emb):
         x = self.parser(notes_sum_emb)
+        print(x.shape)
         return x.sum(2)

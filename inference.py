@@ -28,6 +28,7 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
 
     if not prompt: return None
     words_idx, instruments_idx = dataset.words_to_idx(prompt.lower())
+    print(words_idx, instruments_idx)
     words_tensor = torch.tensor([words_idx], dtype=torch.long).to(DEVICE)
     instruments_tensor = torch.tensor([instruments_idx], dtype=torch.long).to(DEVICE)
 
@@ -37,6 +38,7 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
         backloop_vec = None
         for _ in range(output_tacts_count):
             tact_data, backloop_vec = model(words_tensor, instruments_tensor, backloop_vec=backloop_vec, temperature=temperature, short_notes_coef=short_notes_coef, top_k=top_k)
+            print("INF backloop_vec", backloop_vec.shape)
             tacts.append(tact_data)
 
     try:
@@ -44,13 +46,11 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
 
         for tact in tacts:
             for instrument in tact.keys():
-                inst = instrument
-                if inst == -1: inst = 128
+                inst = int(instrument)
                 united_midi_data.append(282+inst)
 
-                for item in tact[instrument].values():
+                for item in tact[instrument]:
                     united_midi_data.append(item)
-
 
         generated_sequence = tokenizer.decode(united_midi_data)
         file_name = str(uuid.uuid4()).replace('-', '')[:15]

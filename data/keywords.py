@@ -126,7 +126,8 @@ all_instruments = {
     124: "telephone ring",
     125: "helicopter",
     126: "applause",
-    127: "gunshot"
+    127: "gunshot",
+    128: "drums",
 }
 
 all_translations = {
