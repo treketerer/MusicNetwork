@@ -195,8 +195,6 @@ class MusicStreamingDataset(IterableDataset):
         res['idx_prompt'] = torch.tensor(res['idx_prompt'], dtype=torch.long)
         res['instruments'] = torch.tensor(res['instruments'], dtype=torch.long)
 
-
-
         tacts = res.get('tacts')
         tacts_len = len(tacts)
 
@@ -209,7 +207,6 @@ class MusicStreamingDataset(IterableDataset):
         for tact in tacts:
             keys = list(tact.keys())
             if len(keys) > self.max_instruments:
-                # Оставляем только первые 4 инструмента, остальные удаляем из словаря
                 for k in keys[self.max_instruments:]:
                     del tact[k]
 
@@ -217,19 +214,12 @@ class MusicStreamingDataset(IterableDataset):
         max_data = 0
 
         for tact in tacts:
-            # Считаем, сколько инструментов осталось после фильтрации
             if len(tact) > max_instruments:
                 max_instruments = len(tact)
-
-        if max_instruments == 0: max_instruments = 1
-
-        # for tact in tacts:
-        #     for k_idx, key in enumerate(list(tact.keys())):
-        #         if max_instruments < k_idx + 1:
-        #             max_instruments = k_idx + 1
-        #         for n_key, note in enumerate(tact[key]):
-        #             if max_data < n_key + 1:
-        #                 max_data = n_key + 1
+            for key in tact:
+                notes_len = len(tact[key])
+                if notes_len > max_data:
+                    max_data = notes_len
 
         tacts_instruments = torch.zeros((tacts_len, max_instruments), dtype=torch.long)
         tacts_data = torch.zeros((tacts_len, max_instruments, max_data), dtype=torch.long)
