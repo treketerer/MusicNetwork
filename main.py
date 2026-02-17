@@ -70,7 +70,12 @@ def main():
     )
     print("Датасет инициализирован!")
 
-    music_model = MusicNN(dataset.get_words_alphabet_len(), dataset.get_midi_alphabet_len(), 129, 512)
+    music_model = MusicNN(
+        dataset.get_words_alphabet_len(),
+        dataset.get_midi_alphabet_len(),
+        129, 512,
+    164, 256, 256)
+
     print("Модель инициализирована!")
 
     optimizer = optim.Adam(music_model.parameters(), lr=LEARNING_RATE)

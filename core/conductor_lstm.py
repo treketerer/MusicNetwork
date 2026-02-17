@@ -8,7 +8,7 @@ class ConductorLSTM(nn.Module):
 
         self.hidden_size = hidden_size
         self.output_size = output_size
-        self.layer_dim = 3
+        self.layer_dim = 2
 
         self.lstm = nn.LSTM(
             input_size=input_size,
