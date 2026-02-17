@@ -83,6 +83,9 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, o
                     loop.set_postfix(loss=current_loss.item())
                     loss_history.append(current_loss.item())
 
+                if i % 10 == 0:
+                    torch.cuda.empty_cache()
+
             print(f"Эпоха {epoch} завершена!")
             save_model(model_output_path, save_model_id, epoch, model, optimizer, current_loss)
             plt.plot(loss_history)

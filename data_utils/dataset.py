@@ -221,6 +221,8 @@ class MusicStreamingDataset(IterableDataset):
                 if notes_len > max_data:
                     max_data = notes_len
 
+        max_data = min(max_data, self.max_token_in_tact)
+
         tacts_instruments = torch.zeros((tacts_len, max_instruments), dtype=torch.long)
         tacts_data = torch.zeros((tacts_len, max_instruments, max_data), dtype=torch.long)
 
