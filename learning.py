@@ -30,7 +30,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, o
                 batch_size=batch_size,
                 num_workers=2,  # <--- Задействуем 2 ядра для чтения и парсинга
                 persistent_workers=True,  # <--- Не убивать воркеры после эпохи
-                prefetch_factor=10,  # <--- Каждый воркер готовит 10 батчей
+                prefetch_factor=3,  # <--- Каждый воркер готовит 10 батчей
                 collate_fn=dataset.collate_fn,
                 pin_memory=True  # <--- Ускоряет передачу данных
             )
@@ -82,15 +82,13 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, o
                     loop.set_description(f"Epoch {epoch}")
                     loop.set_postfix(loss=current_loss.item())
                     loss_history.append(current_loss.item())
-                if (i+1) % 5 == 0:
-                    save_model(model_output_path, save_model_id, epoch, model, optimizer, current_loss)
-                    plt.plot(loss_history)
-                    plt.title(f"Loss Epoch {epoch} {save_model_id}")
-                    plt.savefig(f"{model_output_path}/{save_model_id}_loss_epoch_{epoch}.png")  # Сохраняем картинку
-                    plt.close()
 
             print(f"Эпоха {epoch} завершена!")
             save_model(model_output_path, save_model_id, epoch, model, optimizer, current_loss)
+            plt.plot(loss_history)
+            plt.title(f"Loss Epoch {epoch} {save_model_id}")
+            plt.savefig(f"{model_output_path}/{save_model_id}_loss_epoch_{epoch}.png")  # Сохраняем картинку
+            plt.close()
 
     except Exception as e:
         print(f"\nОшибка во время обучения: {e}")

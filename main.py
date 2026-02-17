@@ -17,16 +17,16 @@ import asyncio
 asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # CONFIGS
-BATCH_SIZE = 32
+BATCH_SIZE = 8
 LEARNING_RATE = 0.001
-EPOCHS_COUNT = 5
-BUFFER_SIZE = 1000
+EPOCHS_COUNT = 3
+BUFFER_SIZE = 512
 PRINT_COEF = 1000
 
 paths = {
     "collab": "/content/data",
     "collab_output": "/content/project/models",
-    "kaggle_dataset": "/kaggle/input/music-dataset",
+    "kaggle_dataset": "/kaggle/input/datasets/treketerer/midi-dataset",
     "kaggle_input_models": "/kaggle/input/models",
     "kaggle_output_models": "/kaggle/working",
     "local": "./data",
@@ -64,7 +64,7 @@ def main():
     )
     print("Датасет инициализирован!")
 
-    music_model = MusicNN(dataset.get_words_alphabet_len(), dataset.get_midi_alphabet_len(), 129)
+    music_model = MusicNN(dataset.get_words_alphabet_len(), dataset.get_midi_alphabet_len(), 129, 512)
     print("Модель инициализирована!")
 
     optimizer = optim.Adam(music_model.parameters(), lr=LEARNING_RATE)
