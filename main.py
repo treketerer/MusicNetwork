@@ -12,16 +12,16 @@ from gradio_ui import get_gradio_ui
 from learning import learn_model
 from inference import use_model
 
-# Исправление ошибки в Gradle ConnectionResetError: [WinError 10054] Удаленный
-import asyncio
-asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
 # CONFIGS
-BATCH_SIZE = 8
+BATCH_SIZE = 4
 LEARNING_RATE = 0.001
 EPOCHS_COUNT = 3
 BUFFER_SIZE = 512
-PRINT_COEF = 1000
+PRINT_COEF = 1
+
+max_tacts=12
+max_token_in_tact=50
+max_instruments=5
 
 paths = {
     "collab": "/content/data",
@@ -56,11 +56,17 @@ def main():
     if device == "cpu":
         torch.set_num_threads(8)
 
+        # Исправление ошибки в Gradle ConnectionResetError: [WinError 10054] Удаленный
+        import asyncio
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
     dataset = MusicStreamingDataset(
         f"{data_path}/parsed_midi.jsonl",
         f"{data_path}/words_alphabet.jsonl",
         f"{data_path}/midi_alphabet.jsonl",
-        buffer_size=BUFFER_SIZE
+        buffer_size=BUFFER_SIZE,
+        max_tacts=max_tacts, max_token_in_tact=max_token_in_tact,
+        max_instruments=max_instruments
     )
     print("Датасет инициализирован!")
 

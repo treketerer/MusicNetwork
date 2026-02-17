@@ -10,8 +10,9 @@ from data.keywords import ban_list, all_translations, all_instruments
 
 class MusicStreamingDataset(IterableDataset):
     def __init__(self, parsed_midi_path, words_alphabet_path, midi_alphabet_path,
-                 buffer_size=100, max_tacts=20, max_token_in_tact=64):
+                 buffer_size=100, max_tacts=20, max_token_in_tact=64, max_instruments=5):
 
+        self.max_instruments = max_instruments
         self.max_tacts = max_tacts
         self.max_token_in_tact = max_token_in_tact
 
@@ -194,8 +195,7 @@ class MusicStreamingDataset(IterableDataset):
         res['idx_prompt'] = torch.tensor(res['idx_prompt'], dtype=torch.long)
         res['instruments'] = torch.tensor(res['instruments'], dtype=torch.long)
 
-        max_instruments = 0
-        max_data = 0
+
 
         tacts = res.get('tacts')
         tacts_len = len(tacts)
@@ -207,12 +207,29 @@ class MusicStreamingDataset(IterableDataset):
         tacts_len = len(tacts)
 
         for tact in tacts:
-            for k_idx, key in enumerate(list(tact.keys())):
-                if max_instruments < k_idx + 1:
-                    max_instruments = k_idx + 1
-                for n_key, note in enumerate(tact[key]):
-                    if max_data < n_key + 1:
-                        max_data = n_key + 1
+            keys = list(tact.keys())
+            if len(keys) > self.max_instruments:
+                # Оставляем только первые 4 инструмента, остальные удаляем из словаря
+                for k in keys[self.max_instruments:]:
+                    del tact[k]
+
+        max_instruments = 0
+        max_data = 0
+
+        for tact in tacts:
+            # Считаем, сколько инструментов осталось после фильтрации
+            if len(tact) > max_instruments:
+                max_instruments = len(tact)
+
+        if max_instruments == 0: max_instruments = 1
+
+        # for tact in tacts:
+        #     for k_idx, key in enumerate(list(tact.keys())):
+        #         if max_instruments < k_idx + 1:
+        #             max_instruments = k_idx + 1
+        #         for n_key, note in enumerate(tact[key]):
+        #             if max_data < n_key + 1:
+        #                 max_data = n_key + 1
 
         tacts_instruments = torch.zeros((tacts_len, max_instruments), dtype=torch.long)
         tacts_data = torch.zeros((tacts_len, max_instruments, max_data), dtype=torch.long)
