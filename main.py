@@ -2,7 +2,6 @@ import datetime
 import json
 import random
 
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -13,8 +12,6 @@ from gradio_ui import get_gradio_ui
 from learning import learn_model
 from inference import use_model
 
-from data.keywords import all_translations
-
 # Исправление ошибки в Gradle ConnectionResetError: [WinError 10054] Удаленный
 import asyncio
 asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -23,7 +20,7 @@ asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 BATCH_SIZE = 2
 LEARNING_RATE = 0.001
 EPOCHS_COUNT = 1
-BUFFER_SIZE = 3
+BUFFER_SIZE = 5
 PRINT_COEF = 1
 
 paths = {
@@ -40,9 +37,9 @@ data_path = paths.get("local")
 model_input_path = paths.get("local_models")
 model_output_path = paths.get("local_models")
 
-NEED_TO_LEARN = True
-LOAD_LEARNED_MODEL = False
-SAVED_MODEL_PATH = f"{model_input_path}/piano_v1.0.pth"
+NEED_TO_LEARN = False
+LOAD_LEARNED_MODEL = True
+SAVED_MODEL_PATH = f"{model_input_path}/279558_music_model_0.pth"
 
 SOUND_FONT_PATH = "./data/soundfonts/FluidR3_GM.sf2"
 

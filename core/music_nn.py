@@ -66,47 +66,47 @@ class MusicNN(nn.Module):
 
     def learn_nn(self, prompt_idx:torch.Tensor, full_instr_list:torch.Tensor, tacts_instr:torch.Tensor, tacts_data:torch.Tensor):
         # Прогон через Backloop для получения векторов в начало
-        print("\nSTART EMBEDDINGS")
+        # print("\nSTART EMBEDDINGS")
         notes_emb = self.instruments_lstm.midi_embeddings(tacts_data).sum(dim=3)
-        print("ISNT EMV", tacts_data.shape, notes_emb.shape)
+#         print("ISNT EMV", tacts_data.shape, notes_emb.shape)
         backloop_vectors = self.backloop_encoder(notes_emb)
-        print("BACKLOOP", backloop_vectors.shape)
+#         print("BACKLOOP", backloop_vectors.shape)
 
         # Получение половины вектора для инструментов
         instruments_vector = self.instruments_linear_parser(full_instr_list)
-        print("\ninstruments_vector", instruments_vector.shape)
+#         print("\ninstruments_vector", instruments_vector.shape)
         instruments_vector = instruments_vector.sum(dim=1)
-        print("sum instruments_vector", instruments_vector.shape)
+#         print("sum instruments_vector", instruments_vector.shape)
         vibe_vector = self.encoder_model(prompt_idx)
-        print("vibe_vector", vibe_vector.shape)
+#         print("vibe_vector", vibe_vector.shape)
         vibe_vector = vibe_vector.sum(dim=1)
-        print("sum vibe_vector", vibe_vector.shape)
+#         print("sum vibe_vector", vibe_vector.shape)
         constant_vector = torch.cat((vibe_vector, instruments_vector), dim=1)
-        print("constant_vector", constant_vector.shape)
+#         print("constant_vector", constant_vector.shape)
 
         # Получение всех векторов для инструментов
         zeros = torch.zeros_like(backloop_vectors[:, :1, :])
-        print("\nzeros", zeros.shape)
+#         print("\nzeros", zeros.shape)
         backloop_input = torch.cat((zeros, backloop_vectors[:, :-1, :]), dim=1)
-        print("backloop_input", backloop_input.shape)
+#         print("backloop_input", backloop_input.shape)
 
         constant_vector = constant_vector.unsqueeze(1).expand(-1, backloop_input.size(dim=1), -1)
-        print("constant_vector", constant_vector.shape)
+#         print("constant_vector", constant_vector.shape)
         all_input_vectors = torch.cat((constant_vector, backloop_input), dim=2)
-        print("\nall_input_vectors", all_input_vectors.shape)
+#         print("\nall_input_vectors", all_input_vectors.shape)
 
         # Прогон через дирижера, получение предсказания инструментов
         conductor_h, hn, cn = self.conductor_lstm(all_input_vectors)
-        print("\nconductor_h", conductor_h.shape)
+#         print("\nconductor_h", conductor_h.shape)
         instruments_logits = self.conductor_need_instruments_parser(conductor_h)
-        print("instruments_logits", instruments_logits.shape)
+#         print("instruments_logits", instruments_logits.shape)
 
         # Получение нот
         instruments_conductor_vectors = self.instruments_embeddings(tacts_instr)
-        print("\ninstruments_conductor_vectors", instruments_conductor_vectors.shape)
+#         print("\ninstruments_conductor_vectors", instruments_conductor_vectors.shape)
         notes_logits, hn, cn = self.instruments_lstm(conductor_h, instruments_conductor_vectors, tacts_data)
-        print("notes_logits", notes_logits.shape)
-        print(notes_logits.shape, instruments_logits.shape)
+#         print("notes_logits", notes_logits.shape)
+#         print(notes_logits.shape, instruments_logits.shape)
         return notes_logits, instruments_logits
 
     def use_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, backloop_vec = None, h0=None, c0=None, temperature=0.9, short_notes_coef=0.75, top_k=50):

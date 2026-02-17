@@ -10,9 +10,11 @@ from data.keywords import ban_list, all_translations, all_instruments
 
 class MusicStreamingDataset(IterableDataset):
     def __init__(self, parsed_midi_path, words_alphabet_path, midi_alphabet_path,
-                 buffer_size=1000, max_tacts=100):
+                 buffer_size=100, max_tacts=32, max_token_in_tact=100):
 
         self.max_tacts = max_tacts
+        self.max_token_in_tact = max_token_in_tact
+
         self.parsed_midi_path = parsed_midi_path
 
         self.words_alphabet_idx = None
@@ -20,6 +22,8 @@ class MusicStreamingDataset(IterableDataset):
         self.midi_alphabet_idx = None
         self.midi_alphabet_midi = None
         self.midi_alphabet_len = None
+
+        self.dataset_len = -1
 
         self.max_buffer_len = buffer_size
 
@@ -42,6 +46,12 @@ class MusicStreamingDataset(IterableDataset):
                 self.midi_alphabet_len = len(self.midi_alphabet_idx)
             else:
                 print("ФАЙЛ MIDI АЛФАВИТА ПУСТ!!!")
+
+    def __len__(self):
+        if self.dataset_len == -1:
+            with open(self.parsed_midi_path, 'r', encoding='utf-8') as f:
+                self.dataset_len = sum(1 for _ in f)
+        return self.dataset_len
 
     def get_words_alphabet_len(self):
         return len(self.words_alphabet_words)
@@ -121,14 +131,16 @@ class MusicStreamingDataset(IterableDataset):
         max_notes = 0
 
         for item in batch:
-            # [batch, tact, instruments]
+            # [batch, song, tact, instruments]
             t_len, i_len = item['tacts_instruments'].shape
-            # [batch, tact, instruments, notes]
+            # [batch, song, tact, instruments, notes]
             n_len = item['tacts_data'].shape[2]
 
             max_tacts = max(max_tacts, t_len)
             max_inst = max(max_inst, i_len)
             max_notes = max(max_notes, n_len)
+
+        max_notes = max(max_notes, self.max_token_in_tact)
 
         tacts_instruments_padded = torch.zeros((batch_size, max_tacts, max_inst), dtype=torch.long)
         tacts_data_padded = torch.zeros((batch_size, max_tacts, max_inst, max_notes), dtype=torch.long)
@@ -137,8 +149,9 @@ class MusicStreamingDataset(IterableDataset):
             t_len, i_len = item['tacts_instruments'].shape
             n_len = item['tacts_data'].shape[2]
 
+            tokens_slise = min(n_len, max_notes)
             tacts_instruments_padded[i, :t_len, :i_len] = item['tacts_instruments']
-            tacts_data_padded[i, :t_len, :i_len, :n_len] = item['tacts_data']
+            tacts_data_padded[i, :t_len, :i_len, :n_len] = item['tacts_data'][:t_len, :i_len, :tokens_slise]
 
         # Паддинг (заполняем нулями короткие последовательности)
         prompts_padded = pad_sequence(prompts, batch_first=True, padding_value=0)
@@ -187,9 +200,11 @@ class MusicStreamingDataset(IterableDataset):
         max_data = 0
 
         tacts = res.get('tacts')
+        tacts_len = len(tacts)
 
-        if len(tacts) > self.max_tacts:
-            tacts = tacts[:self.max_tacts]
+        if tacts_len > self.max_tacts:
+            rand_start = random.randint(0, tacts_len - self.max_tacts)
+            tacts = tacts[rand_start : rand_start+self.max_tacts]
 
         tacts_len = len(tacts)
 

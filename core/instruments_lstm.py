@@ -8,7 +8,7 @@ class InstrumentsLSTM(nn.Module):
     def __init__(self, input_size: int, midi_alphabet_size: int, midi_emb_dim: int):
         super(InstrumentsLSTM, self).__init__()
 
-        print(midi_alphabet_size, midi_emb_dim)
+        # print(midi_alphabet_size, midi_emb_dim)
         self.midi_embeddings = nn.Embedding(midi_alphabet_size, midi_emb_dim)
 
         self.input_size = input_size
@@ -32,19 +32,19 @@ class InstrumentsLSTM(nn.Module):
         """
 
         bd, tb, ib, nb = tacts_notes.shape
-        print("In SHAPE", bd, tb, ib, nb)
+        # print("In SHAPE", bd, tb, ib, nb)
         notes_vec = self.midi_embeddings(tacts_notes)
-        print("NV", notes_vec.shape)
+#         print("NV", notes_vec.shape)
         cond_vec = conductor_context.unsqueeze(2).unsqueeze(3).expand(bd, tb, ib, nb, -1)
-        print("cond_vec", cond_vec.shape)
-        print("inst_vec", instruments_emb.shape)
+#         print("cond_vec", cond_vec.shape)
+#         print("inst_vec", instruments_emb.shape)
         inst_vec = instruments_emb.unsqueeze(3).expand(bd, tb, ib, nb, -1)
-        print("inst_vec", inst_vec.shape)
+#         print("inst_vec", inst_vec.shape)
 
         input_vec = torch.cat([cond_vec, inst_vec, notes_vec], dim=-1)
-        print("input_vec", input_vec.shape)
+#         print("input_vec", input_vec.shape)
         input_flat = input_vec.view(bd * tb * ib, nb, -1)
-        print("input_flat", input_flat.shape)
+#         print("input_flat", input_flat.shape)
 
         if h0 is None and c0 is None:
             h0 = torch.zeros(self.layer_dim, bd * tb * ib, self.hidden_state).to(device)

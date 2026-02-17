@@ -17,8 +17,7 @@ class SongInstrumentsLinearParser(nn.Module):
 
     def forward(self, instruments_idx):
         instruments_emb = self.instruments_embeddings(instruments_idx)
-        print("DIM", instruments_emb.shape)
-        x = self.parser(instruments_emb)#.sum(dim=2))
+        x = self.parser(instruments_emb)
         return x
 
 class ConductorInstrumentsParser(nn.Module):

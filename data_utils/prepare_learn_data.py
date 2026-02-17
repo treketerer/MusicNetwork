@@ -44,7 +44,7 @@ def init_worker():
     worker_tokenizer = REMI(config)
 
 def get_midi_prompt(prompts_tags):
-    midi_prompt = []
+    midi_prompt = {}
     # with open('../data/midi_prompt_meta_keys.jsonl', 'r', encoding='utf-8') as f:
     print(len(prompts_tags))
     for i, items in enumerate(prompts_tags):
@@ -61,52 +61,17 @@ def get_midi_prompt(prompts_tags):
             if key in all_translations:
                 prompt_form = random.choice(all_translations[key])
             exit_prompt.append(prompt_form)
-        midi_prompt.append((track, ' '.join(exit_prompt).lower(), instruments_arr))
+        midi_prompt[track] = (track, ' '.join(exit_prompt).lower(), instruments_arr)
 
         if i % 1000000 == 0:
             print(f"{i}/{len(prompts_tags)}")
 
     return midi_prompt
 
-
-def save_prompts(midi_prompt):
-    words_prompts_file = open("../data/midi_words_prompts.jsonl", 'w', encoding='utf-8')
-    idx_prompts_file = open("../data/midi_idx_prompts.jsonl", 'w', encoding='utf-8')
-
-    alphabet_file = open("../data/words_alphabet.jsonl", 'r', encoding='utf-8')
-    alphabet_file.readline()
-    raw_words_alphabet = alphabet_file.readline()
-    words_alphabet = json.loads(raw_words_alphabet)
-    alphabet_file.close()
-
-    for md5, prompt, instruments in midi_prompt:
-        json_word_line = {
-            "md5": md5,
-            "prompt_keys": ' '.join(prompt.split())
-        }
-
-        idx_prompt = []
-        for word in prompt.split():
-            if word in words_alphabet:
-                idx_prompt.append(words_alphabet[word])
-            else:
-                idx_prompt.append(words_alphabet["<unk>"])
-
-        json_idx_line = {
-            "md5": md5,
-            "prompt_keys": idx_prompt,
-            "instruments": instruments
-        }
-
-        words_prompts_file.write(json.dumps(json_word_line, ensure_ascii=False) + "\n")
-        idx_prompts_file.write(json.dumps(json_idx_line, ensure_ascii=False) + "\n")
-
-
 def init_alphabets():
     alphabet_words = set()
 
     for key, values in all_translations.items():
-        # print(key, values)
         alphabet_words.add(key.lower())
         value_words = " ".join(values).split()
         for word in value_words:
@@ -123,7 +88,6 @@ def init_alphabets():
         f.write(json.dumps(alph_dict, ensure_ascii=False) + "\n")
         f.write(json.dumps(reverse_alph_dict, ensure_ascii=False) + "\n")
 
-
     config = TokenizerConfig(num_velocities=16, use_chords=True, use_programs=True)
     tokenizer = REMI(config)
     vocab = tokenizer.vocab
@@ -135,7 +99,8 @@ def init_alphabets():
 
     return alph_list
 
-def process_single_midi(md5):
+def process_single_midi(data: list):
+    md5, _, prompt_idx, instruments_arr = data
     global worker_tokenizer
     start_programs_token = 282
     tacts = []
@@ -181,8 +146,6 @@ def process_single_midi(md5):
             if token >= start_programs_token:
                 now_instrument_id = token - start_programs_token
                 print(now_instrument_id)
-                # if now_instrument_id == 128: лишнее, вызывает ошибку
-                #     now_instrument_id = -1
 
                 if now_instrument_id not in tact:
                     tact[now_instrument_id] = (tact['prepare']).copy()
@@ -205,7 +168,7 @@ def process_single_midi(md5):
         print(e)
         return {"error": f"UNHANDLED_EXCEPTION: {e} {tact} {tacts}", "md5": md5}
 
-def parse_midi_tokens(md5_paths):
+def parse_midi_tokens(md5_paths, midi_prompts):
     parsed_files = set()
     if os.path.exists("../data/parsed_midi.jsonl"):
         with open("../data/parsed_midi.jsonl", "r", encoding="utf-8") as f:
@@ -219,7 +182,7 @@ def parse_midi_tokens(md5_paths):
 
     for md5 in md5_paths:
         if md5 not in parsed_files and os.path.exists(f"{base_path}{md5}.mid"):
-            to_process.append(md5)
+            to_process.append((md5, *midi_prompts[md5]))
 
     total_files = len(to_process)
     print(f"К обработке: {len(to_process)} файлов")
@@ -261,14 +224,13 @@ def main():
     midi_prompts = get_midi_prompt(prompts_tags)
     del prompts_tags
     print("ПРОМПТЫ СОСТАВЛЕНЫ!")
-    save_prompts(midi_prompts)
-    print("ПРОМПТЫ СОХРАНЕНЫ В ФАЙЛ!")
+    # save_prompts(midi_prompts)
+    # print("ПРОМПТЫ СОХРАНЕНЫ В ФАЙЛ!")
 
     all_md5_list = list(all_md5)[:70000]
-    del midi_prompts
     del all_md5
     print("Запуск токенизации MIDI файлов!")
-    parse_midi_tokens(all_md5)
+    parse_midi_tokens(all_md5, midi_prompts)
     print("MIDI ФАЙЛЫ ТОКЕНИЗИРОВАННЫ!")
 
 
