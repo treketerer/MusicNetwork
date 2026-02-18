@@ -13,14 +13,14 @@ from learning import learn_model
 from inference import use_model
 
 # CONFIGS
-BATCH_SIZE = 16
+BATCH_SIZE = 6
 LEARNING_RATE = 0.001
-EPOCHS_COUNT = 3
+EPOCHS_COUNT = 1
 BUFFER_SIZE = 1024
 PRINT_COEF = 1
 
-max_tacts=20
-max_token_in_tact=75
+max_tacts=15
+max_token_in_tact=100
 max_instruments=10
 
 paths = {

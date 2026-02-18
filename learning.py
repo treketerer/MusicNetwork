@@ -13,6 +13,12 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, optimizer, epochs_count: int, batch_size: int, print_coef: int, model_output_path: str, save_model_id: int):
     # Обучение
+
+    if DEVICE == "cuda":
+        torch.cuda.empty_cache()  # Очистить неиспользуемую память
+        import gc
+        gc.collect()
+
     model.train()
     model.to(DEVICE)
     print("ОБУЧЕНИЕ НАЧАЛОСЬ!")
@@ -83,15 +89,20 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, o
                     loop.set_postfix(loss=current_loss.item())
                     loss_history.append(current_loss.item())
 
-                if i % 10 == 0:
-                    torch.cuda.empty_cache()
+                if i % 3500 == 0:
+                    save_model(model_output_path, save_model_id, f"{epoch}_{i}", model, optimizer, current_loss)
 
             print(f"Эпоха {epoch} завершена!")
-            save_model(model_output_path, save_model_id, epoch, model, optimizer, current_loss)
-            plt.plot(loss_history)
-            plt.title(f"Loss Epoch {epoch} {save_model_id}")
-            plt.savefig(f"{model_output_path}/{save_model_id}_loss_epoch_{epoch}.png")  # Сохраняем картинку
-            plt.close()
+            try:
+                save_model(model_output_path, save_model_id, f"{epoch}_final", model, optimizer, current_loss)
+                plt.clf()
+                plt.plot(loss_history)
+                plt.title(f"Loss Epoch {epoch} {save_model_id}")
+                plt.savefig(f"{model_output_path}/{save_model_id}_loss_epoch_{epoch}.png")  # Сохраняем картинку
+                plt.close()
+            except Exception as ex:
+                save_model(model_output_path, save_model_id, f"{epoch}", model, optimizer, current_loss)
+
 
     except Exception as e:
         print(f"\nОшибка во время обучения: {e}")
