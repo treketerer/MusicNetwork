@@ -148,9 +148,12 @@ class MusicStreamingDataset(IterableDataset):
             t_len, i_len = item['tacts_instruments'].shape
             n_len = item['tacts_data'].shape[2]
 
-            tokens_slise = min(n_len, max_notes)
-            tacts_instruments_padded[i, :t_len, :i_len] = item['tacts_instruments']
-            tacts_data_padded[i, :t_len, :i_len, :n_len] = item['tacts_data'][:t_len, :i_len, :tokens_slise]
+            safe_t = min(t_len, max_tacts)
+            safe_i = min(i_len, max_inst)
+            safe_n = min(n_len, max_notes)
+
+            tacts_instruments_padded[i, :safe_t, :safe_i] = item['tacts_instruments'][:safe_t, :safe_i]
+            tacts_data_padded[i, :safe_t, :safe_i, :safe_n] = item['tacts_data'][:safe_t, :safe_i, :safe_n]
 
         # Паддинг (заполняем нулями короткие последовательности)
         prompts_padded = pad_sequence(prompts, batch_first=True, padding_value=0)
@@ -231,7 +234,9 @@ class MusicStreamingDataset(IterableDataset):
                 int_key = int(key)
                 tacts_instruments[tact_idx, k_idx] = int_key
 
-                for n_key, note in enumerate(tact[key]):
+                notes_list = tact[key]
+                actual_notes_to_fill = min(len(notes_list), max_data)
+                for n_key in range(actual_notes_to_fill):
                     tacts_data[tact_idx, k_idx, n_key] = tact[key][n_key]
 
         res['tacts_instruments'] = tacts_instruments

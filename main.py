@@ -13,15 +13,15 @@ from learning import learn_model
 from inference import use_model
 
 # CONFIGS
-BATCH_SIZE = 4
+BATCH_SIZE = 16
 LEARNING_RATE = 0.001
 EPOCHS_COUNT = 3
-BUFFER_SIZE = 512
+BUFFER_SIZE = 1024
 PRINT_COEF = 1
 
-max_tacts=12
-max_token_in_tact=50
-max_instruments=5
+max_tacts=20
+max_token_in_tact=75
+max_instruments=10
 
 paths = {
     "collab": "/content/data",
@@ -74,7 +74,7 @@ def main():
         dataset.get_words_alphabet_len(),
         dataset.get_midi_alphabet_len(),
         129, 512,
-    164, 256, 256)
+    256, 256, 512)
 
     print("Модель инициализирована!")
 

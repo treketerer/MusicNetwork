@@ -97,7 +97,7 @@ class MusicNN(nn.Module):
         constant_vector = constant_vector.unsqueeze(1).expand(-1, backloop_input.size(dim=1), -1)
 #         print("constant_vector", constant_vector.shape)
         all_input_vectors = torch.cat((constant_vector, backloop_input), dim=2)
-#         print("\nall_input_vectors", all_input_vectors.shape)
+        # print("\nall_input_vectors", all_input_vectors.shape)
 
         # Прогон через дирижера, получение предсказания инструментов
         conductor_h, hn, cn = self.conductor_lstm(all_input_vectors)
@@ -107,7 +107,7 @@ class MusicNN(nn.Module):
 
         # Получение нот
         instruments_conductor_vectors = self.instruments_embeddings(tacts_instr)
-#         print("\ninstruments_conductor_vectors", instruments_conductor_vectors.shape)
+        # print("\nPRE INSTRUMENTS", conductor_h.shape, instruments_conductor_vectors.shape, tacts_data.shape)
         notes_logits, hn, cn = self.instruments_lstm(conductor_h, instruments_conductor_vectors, tacts_data)
 #         print("notes_logits", notes_logits.shape)
 #         print(notes_logits.shape, instruments_logits.shape)
