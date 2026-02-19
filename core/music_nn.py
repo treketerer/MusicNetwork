@@ -115,6 +115,8 @@ class MusicNN(nn.Module):
         return notes_logits, instruments_logits
 
     def use_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, backloop_vec = None, h0=None, c0=None, max_tokens=35, temperature=0.9, short_notes_coef=0.75, top_k=50):
+        device = next(self.parameters()).device
+
         # Получение половины вектора для инструментов
         instruments_vector = self.instruments_linear_parser(full_instr_list).sum(dim=1)
         # print("instruments_vector", instruments_vector.shape)
@@ -124,7 +126,7 @@ class MusicNN(nn.Module):
 #         print("constant_vector", constant_vector.shape)
 
         if backloop_vec is None:
-            backloop_vec = torch.zeros((1, self.backloop_output_size))
+            backloop_vec = torch.zeros((1, self.backloop_output_size)).to(device)
 #         print("backloop_vec", backloop_vec.shape)
 
         # Получение всех векторов для инструментов
@@ -138,7 +140,7 @@ class MusicNN(nn.Module):
 #         print("instruments_logits", instruments_logits.shape)
 #         print("instruments_logits", instruments_logits)
 
-        print(instruments_logits)
+        # print(instruments_logits)
         # Получаем самые вероятные инструменты
 
         instruments_probs = torch.sigmoid(instruments_logits)
@@ -162,7 +164,7 @@ class MusicNN(nn.Module):
 
         for i in range(max_tokens):
 #             print("current_tact_data", current_tact_data)
-            tact_data_tensor = torch.tensor(current_tact_data, dtype=torch.long)
+            tact_data_tensor = torch.tensor(current_tact_data, dtype=torch.long).to(device)
             tact_data_tensor = tact_data_tensor.unsqueeze(0).unsqueeze(0)
 
 #             print(conductor_h.shape, instruments_conductor_vectors.shape, tact_data_tensor.shape)

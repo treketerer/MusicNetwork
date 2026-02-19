@@ -71,7 +71,6 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                     target_tdata[:, :, :, 1:].reshape(-1)
                 )
 
-
                 target_inst_multihot = torch.zeros(target_inst.shape[0], target_inst.shape[1], 130, device=DEVICE)
                 target_inst_multihot.scatter_(2, target_inst, 1)
 
@@ -82,8 +81,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                     target_real.reshape(-1, 129).float()
                 )
 
-                instrum_loss_coef = 2.5
-                current_loss = loss_notes + (instrum_loss_coef * loss_inst)
+                current_loss = loss_notes * 1.5 + loss_inst * 1.0
                 loss_normalized = current_loss / accumulation_steps
                 loss_normalized.backward()
 
@@ -94,7 +92,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
 
                     current_lr = optimizer.param_groups[0]['lr']
 
-                    loop.set_postfix(loss=current_loss.item(), lr=current_lr)
+                    loop.set_postfix(loss=current_loss.item(), loss_inst=loss_inst.item(), loss_notes=loss_notes.item(), lr=current_lr)
                     loss_history.append(current_loss.item())
 
                     scheduler.step(current_loss.item())

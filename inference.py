@@ -31,6 +31,10 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
     words_idx, instruments_idx = dataset.words_to_idx(prompt.lower())
     print(words_idx, instruments_idx)
     words_tensor = torch.tensor([words_idx], dtype=torch.long).to(DEVICE)
+
+    if len(instruments_idx) == 0:
+        instruments_idx = [0]
+
     instruments_tensor = torch.tensor([instruments_idx], dtype=torch.long).to(DEVICE)
 
     tacts = []

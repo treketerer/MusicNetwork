@@ -14,7 +14,7 @@ from inference import use_model
 
 # CONFIGS
 BATCH_SIZE = 4
-LEARNING_RATE = 0.00075
+LEARNING_RATE = 0.0003
 EPOCHS_COUNT = 2
 BUFFER_SIZE = 1024
 PRINT_COEF = 1
@@ -41,7 +41,7 @@ model_output_path = paths.get("kaggle_output_models")
 
 NEED_TO_LEARN = True
 LOAD_LEARNED_MODEL = True
-SAVED_MODEL_PATH = f"{model_input_path}/135089_music_model_3_7000.pth"
+SAVED_MODEL_PATH = f"{model_input_path}/135089_music_model_4_final.pth"
 
 SOUND_FONT_PATH = "./data/soundfonts/FluidR3_GM.sf2"
 
@@ -85,15 +85,14 @@ def main():
     if LOAD_LEARNED_MODEL:
         checkpoint = torch.load(SAVED_MODEL_PATH, weights_only=False, map_location=torch.device(device))
 
-        state_dict = checkpoint
+        # Удаляем упоминания старой матрицы - больше не нужно
+        # for key in [
+        #     'instruments_embeddings.weight', 'instruments_linear_parser.instruments_embeddings.weight']:
+        #     if key in checkpoint['model_state_dict']:
+        #         del checkpoint['model_state_dict'][key]
+        #         print(f"♻️ Удален старый ключ весов: {key}")
 
-        # Удаляем старые эмбеддинги инструментов из-за изменения размера (129 -> 130)
-        weights_dict = checkpoint['model_state_dict']
-        if 'instruments_embeddings.weight' in weights_dict:
-            del weights_dict['instruments_embeddings.weight']
-            print("Старые веса instruments_embeddings удалены.")
-
-        missing_keys, unexpected_keys = music_model.load_state_dict(state_dict['model_state_dict'], strict=False)
+        missing_keys, unexpected_keys = music_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
         print(f"Пропущены ключи обучения {missing_keys}")
 
         if 'optimizer_state_dict' in checkpoint and len(missing_keys) == 0:
