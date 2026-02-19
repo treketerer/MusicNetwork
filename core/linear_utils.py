@@ -37,18 +37,30 @@ class ConductorInstrumentsParser(nn.Module):
         x = self.parser(conductor_h)
         return x
     
-class BackloopLinearEncoder(nn.Module):
-    def __init__(self, input_dim: int, inner_dim: int, output_dim: int):
-        super(BackloopLinearEncoder, self).__init__()
+class BackloopEncoder(nn.Module):
+    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int):
+        super(BackloopEncoder, self).__init__()
 
-        self.parser =  nn.Sequential(
-            nn.Linear(input_dim, inner_dim),
-            nn.ReLU(),
-            nn.LayerNorm(inner_dim),
-            nn.Linear(inner_dim, output_dim)
+        self.gru = nn.GRU(
+            input_size=input_dim,
+            hidden_size=hidden_dim,
+            num_layers=1,
+            batch_first=True,
+            dropout=0.2,
+            bidirectional=False
         )
 
-    def forward(self, notes_sum_emb):
-        x = self.parser(notes_sum_emb)
-        # print(x.shape)
-        return x.sum(2)
+        self.linear = nn.Sequential(
+            nn.Linear(hidden_dim, output_dim),
+            nn.ReLU(),
+            nn.LayerNorm(output_dim)
+        )
+
+    def forward(self, notes_emb):
+        # notes_sum_emb - bd, td, nd, ed
+        bd, td, ind, nd, ed = notes_emb.shape
+
+        parsed = notes_emb.view(bd * td, ind * nd, ed)
+        _, h = self.gru(parsed)
+        x = self.linear(h.squeeze(0))
+        return x.view(bd, td, -1)

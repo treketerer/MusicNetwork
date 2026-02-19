@@ -11,7 +11,10 @@ from data_utils import MusicStreamingDataset
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, optimizer, epochs_count: int, batch_size: int, print_coef: int, model_output_path: str, save_model_id: int):
+def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, scheduler,
+                epochs_count: int, batch_size: int, accumulation_steps: int,
+                model_output_path: str, save_model_id: int):
+    optimizer.zero_grad()
     # Обучение
 
     if DEVICE == "cuda":
@@ -27,7 +30,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, o
     current_loss = None
 
     criterion_notes = nn.CrossEntropyLoss(ignore_index=0)
-    criterion_insts = nn.BCEWithLogitsLoss()
+    criterion_insts = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(10.0).to(DEVICE))
 
     try:
         for epoch in range(epochs_count):
@@ -42,11 +45,10 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, o
             )
 
             loop = tqdm(train_loader, leave=False)
+            loop.set_description(f"Epoch {epoch}")
             loss_history = []
 
             for i, batch in enumerate(loop):
-                optimizer.zero_grad()
-
                 prompts = batch.get('idx_prompts').to(DEVICE, non_blocking=True)
                 full_instruments = batch.get('instruments').to(DEVICE, non_blocking=True)
                 tacts_data = batch.get('tacts_data').to(DEVICE, non_blocking=True)
@@ -77,19 +79,24 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, loss_function, o
                     target_inst_multihot.reshape(-1, 129).float()
                 )
 
-                instrum_loss_coef = 0.5
+                instrum_loss_coef = 2.5
                 current_loss = loss_notes + (instrum_loss_coef * loss_inst)
+                loss_normalized = current_loss / accumulation_steps
+                loss_normalized.backward()
 
-                current_loss.backward()
-                nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-                optimizer.step()
+                if (i + 1) % accumulation_steps == 0:
+                    nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                    optimizer.step()
+                    optimizer.zero_grad()
 
-                if (i + 1) % print_coef == 0:
-                    loop.set_description(f"Epoch {epoch}")
-                    loop.set_postfix(loss=current_loss.item())
+                    current_lr = optimizer.param_groups[0]['lr']
+
+                    loop.set_postfix(loss=current_loss.item(), lr=current_lr)
                     loss_history.append(current_loss.item())
 
-                if i % 3500 == 0:
+                    scheduler.step(current_loss.item())
+
+                if i % 3500 == 0 and i > 0:
                     save_model(model_output_path, save_model_id, f"{epoch}_{i}", model, optimizer, current_loss)
 
             print(f"Эпоха {epoch} завершена!")

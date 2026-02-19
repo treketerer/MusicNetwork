@@ -1,4 +1,5 @@
 import torch
+from tqdm import tqdm
 
 from core.music_nn import MusicNN
 from data_utils.dataset import MusicStreamingDataset
@@ -36,21 +37,24 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
 
     with torch.no_grad():
         backloop_vec = None
-        for _ in range(output_tacts_count):
+        for _ in tqdm(range(output_tacts_count)):
             tact_data, backloop_vec = model(words_tensor, instruments_tensor, backloop_vec=backloop_vec, temperature=temperature, short_notes_coef=short_notes_coef, top_k=top_k)
-            print("INF backloop_vec", backloop_vec.shape)
+            # print("INF backloop_vec", backloop_vec.shape)
             tacts.append(tact_data)
 
     try:
         united_midi_data = []
 
         for tact in tacts:
+            united_midi_data.append(4)
+
             for instrument in tact.keys():
                 inst = int(instrument)
                 united_midi_data.append(282+inst)
 
                 for item in tact[instrument]:
-                    united_midi_data.append(item)
+                    if item not in [0, 1, 2, 4]:
+                        united_midi_data.append(item)
 
         generated_sequence = tokenizer.decode(united_midi_data)
         file_name = str(uuid.uuid4()).replace('-', '')[:15]

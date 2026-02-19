@@ -13,15 +13,16 @@ from learning import learn_model
 from inference import use_model
 
 # CONFIGS
-BATCH_SIZE = 6
-LEARNING_RATE = 0.001
-EPOCHS_COUNT = 1
+BATCH_SIZE = 4
+LEARNING_RATE = 0.0005
+EPOCHS_COUNT = 2
 BUFFER_SIZE = 1024
 PRINT_COEF = 1
+ACCUMULATION_STEPS = 16
 
-max_tacts=15
-max_token_in_tact=100
-max_instruments=10
+max_tacts = 15
+max_token_in_tact = 100
+max_instruments = 10
 
 paths = {
     "collab": "/content/data",
@@ -38,8 +39,8 @@ model_input_path = paths.get("kaggle_input_models")
 model_output_path = paths.get("kaggle_output_models")
 
 NEED_TO_LEARN = True
-LOAD_LEARNED_MODEL = False
-SAVED_MODEL_PATH = f"{model_input_path}/279558_music_model_0.pth"
+LOAD_LEARNED_MODEL = True
+SAVED_MODEL_PATH = f"{model_input_path}/135089_music_model_1_final.pth"
 
 SOUND_FONT_PATH = "./data/soundfonts/FluidR3_GM.sf2"
 
@@ -82,8 +83,10 @@ def main():
 
     if LOAD_LEARNED_MODEL:
         checkpoint = torch.load(SAVED_MODEL_PATH, weights_only=False, map_location=torch.device(device))
-        music_model.load_state_dict(checkpoint['model_state_dict'])
-        if 'optimizer_state_dict' in checkpoint:
+        missing_keys, unexpected_keys = music_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+        print(f"Пропущены ключи обучения {missing_keys}")
+
+        if 'optimizer_state_dict' in checkpoint and len(missing_keys) == 0:
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             # Принудительно переносим состояние оптимизатора на GPU
             for state in optimizer.state.values():
@@ -93,22 +96,29 @@ def main():
             for param_group in optimizer.param_groups:
                 param_group['lr'] = LEARNING_RATE
 
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode='min',
+        factor= 0.65,
+        patience= 300,
+        threshold= 1e-6
+    )
+
     if NEED_TO_LEARN:
-        loss_function = nn.CrossEntropyLoss()
         print("Оптимизаторы инициализированы!")
 
         start = datetime.datetime.now()
         print("ОБУЧЕНИЕ НАЧАЛОСЬ!")
         learn_model(
-            music_model,
-            dataset,
-            loss_function,
-            optimizer,
-            EPOCHS_COUNT,
-            BATCH_SIZE,
-            PRINT_COEF,
-            model_output_path,
-            random.randint(111111, 999999)
+            model=music_model,
+            dataset=dataset,
+            optimizer=optimizer,
+            epochs_count=EPOCHS_COUNT,
+            batch_size=BATCH_SIZE,
+            accumulation_steps=ACCUMULATION_STEPS,
+            model_output_path=model_output_path,
+            save_model_id=random.randint(111111, 999999),
+            scheduler=scheduler
         )
         finish = datetime.datetime.now()
         print('Обучение завершено!\nВремя работы: ' + str(finish - start))
@@ -126,4 +136,3 @@ def gradio_use(prompt: str, temperature: float, top_k: int, duration: float, out
 if __name__ == "__main__":
     print("\nWORKER INITIALIZED")
     main()
-
