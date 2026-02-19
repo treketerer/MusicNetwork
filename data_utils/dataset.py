@@ -141,7 +141,7 @@ class MusicStreamingDataset(IterableDataset):
 
         max_notes = max(max_notes, self.max_token_in_tact)
 
-        tacts_instruments_padded = torch.zeros((batch_size, max_tacts, max_inst), dtype=torch.long)
+        tacts_instruments_padded = torch.full((batch_size, max_tacts, max_inst), 129, dtype=torch.long)
         tacts_data_padded = torch.zeros((batch_size, max_tacts, max_inst, max_notes), dtype=torch.long)
 
         for i, item in enumerate(batch):
@@ -157,7 +157,7 @@ class MusicStreamingDataset(IterableDataset):
 
         # Паддинг (заполняем нулями короткие последовательности)
         prompts_padded = pad_sequence(prompts, batch_first=True, padding_value=0)
-        instruments =  pad_sequence(instruments, batch_first=True, padding_value=0)
+        instruments =  pad_sequence(instruments, batch_first=True, padding_value=129)
 
         return {'idx_prompts': prompts_padded, 'tacts_instruments': tacts_instruments_padded, 'tacts_data': tacts_data_padded, 'instruments': instruments}
 

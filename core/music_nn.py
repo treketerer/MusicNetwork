@@ -25,8 +25,9 @@ class MusicNN(nn.Module):
         self.backloop_output_size = self.inner_context_size
 
         self.instruments_embeddings = nn.Embedding(
-            self.instruments_counts,
-            self.instruments_embedding_size
+            self.instruments_counts + 1,
+            self.instruments_embedding_size,
+            padding_idx=129
         )
 
         self.instruments_linear_parser = SongInstrumentsLinearParser(
@@ -139,8 +140,11 @@ class MusicNN(nn.Module):
 
         print(instruments_logits)
         # Получаем самые вероятные инструменты
+
+        instruments_probs = torch.sigmoid(instruments_logits)
+
         threshold = 0.35
-        active_mask = instruments_logits > threshold
+        active_mask = instruments_probs > threshold
         instruments_indices = torch.where(active_mask)[1]
 #         print("INST", instruments_indices)
 

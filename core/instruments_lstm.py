@@ -9,7 +9,7 @@ class InstrumentsLSTM(nn.Module):
         super(InstrumentsLSTM, self).__init__()
 
         # print(midi_alphabet_size, midi_emb_dim)
-        self.midi_embeddings = nn.Embedding(midi_alphabet_size, midi_emb_dim)
+        self.midi_embeddings = nn.Embedding(midi_alphabet_size, midi_emb_dim, padding_idx=0)
 
         self.input_size = input_size
         self.hidden_state = self.input_size

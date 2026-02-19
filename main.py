@@ -14,11 +14,12 @@ from inference import use_model
 
 # CONFIGS
 BATCH_SIZE = 4
-LEARNING_RATE = 0.0005
+LEARNING_RATE = 0.00075
 EPOCHS_COUNT = 2
 BUFFER_SIZE = 1024
 PRINT_COEF = 1
 ACCUMULATION_STEPS = 16
+SCHEDULER_PATIENCE = 150
 
 max_tacts = 15
 max_token_in_tact = 100
@@ -28,7 +29,7 @@ paths = {
     "collab": "/content/data",
     "collab_output": "/content/project/models",
     "kaggle_dataset": "/kaggle/input/datasets/treketerer/midi-dataset",
-    "kaggle_input_models": "/kaggle/input/models",
+    "kaggle_input_models": "/kaggle/input/datasets/treketerer/models",
     "kaggle_output_models": "/kaggle/working",
     "local": "./data",
     "local_models": "./models"
@@ -40,7 +41,7 @@ model_output_path = paths.get("kaggle_output_models")
 
 NEED_TO_LEARN = True
 LOAD_LEARNED_MODEL = True
-SAVED_MODEL_PATH = f"{model_input_path}/135089_music_model_1_final.pth"
+SAVED_MODEL_PATH = f"{model_input_path}/135089_music_model_3_7000.pth"
 
 SOUND_FONT_PATH = "./data/soundfonts/FluidR3_GM.sf2"
 
@@ -83,7 +84,16 @@ def main():
 
     if LOAD_LEARNED_MODEL:
         checkpoint = torch.load(SAVED_MODEL_PATH, weights_only=False, map_location=torch.device(device))
-        missing_keys, unexpected_keys = music_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+
+        state_dict = checkpoint
+
+        # Удаляем старые эмбеддинги инструментов из-за изменения размера (129 -> 130)
+        weights_dict = checkpoint['model_state_dict']
+        if 'instruments_embeddings.weight' in weights_dict:
+            del weights_dict['instruments_embeddings.weight']
+            print("Старые веса instruments_embeddings удалены.")
+
+        missing_keys, unexpected_keys = music_model.load_state_dict(state_dict['model_state_dict'], strict=False)
         print(f"Пропущены ключи обучения {missing_keys}")
 
         if 'optimizer_state_dict' in checkpoint and len(missing_keys) == 0:
@@ -99,8 +109,8 @@ def main():
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
         mode='min',
-        factor= 0.65,
-        patience= 300,
+        factor=0.65,
+        patience=SCHEDULER_PATIENCE,
         threshold= 1e-6
     )
 

@@ -71,12 +71,15 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                     target_tdata[:, :, :, 1:].reshape(-1)
                 )
 
-                target_inst_multihot = torch.zeros(target_inst.shape[0], target_inst.shape[1], 129, device=DEVICE)
+
+                target_inst_multihot = torch.zeros(target_inst.shape[0], target_inst.shape[1], 130, device=DEVICE)
                 target_inst_multihot.scatter_(2, target_inst, 1)
+
+                target_real = target_inst_multihot[:, :, :129]
 
                 loss_inst = criterion_insts(
                     instruments_logits.reshape(-1, 129),
-                    target_inst_multihot.reshape(-1, 129).float()
+                    target_real.reshape(-1, 129).float()
                 )
 
                 instrum_loss_coef = 2.5

@@ -8,7 +8,8 @@ class EncoderLinear(nn.Module):
 
         self.embeddings_layer = nn.Embedding(
             alphabet_size,
-            text_emb_dim
+            text_emb_dim,
+            padding_idx=0
         )
 
         self.encoder = nn.Sequential(

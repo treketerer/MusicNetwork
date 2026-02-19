@@ -30,7 +30,6 @@ class ConductorInstrumentsParser(nn.Module):
             nn.ReLU(),
             nn.LayerNorm(inner_dim),
             nn.Linear(inner_dim, self.instruments_count),
-            nn.Sigmoid()
         )
 
     def forward(self, conductor_h):
@@ -59,8 +58,9 @@ class BackloopEncoder(nn.Module):
     def forward(self, notes_emb):
         # notes_sum_emb - bd, td, nd, ed
         bd, td, ind, nd, ed = notes_emb.shape
+        rhythm_emb = notes_emb.sum(2)
+        parsed = rhythm_emb.view(bd * td, nd, ed)
 
-        parsed = notes_emb.view(bd * td, ind * nd, ed)
         _, h = self.gru(parsed)
         x = self.linear(h.squeeze(0))
         return x.view(bd, td, -1)
