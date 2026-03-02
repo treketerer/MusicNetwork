@@ -3,38 +3,25 @@ import torch.nn as nn
 from torch import tensor
 
 class EncoderLinear(nn.Module):
-    def __init__(self, inner_context_size: int, alphabet_size: int):
+    def __init__(self, alphabet_size: int, text_emb_dim:int, inner_context_size: int, output_dim: int):
         super(EncoderLinear, self).__init__()
 
-        self.alphabet_emb = None
-        self.alphabet_words = None
-
-        self.middle_dim = 1024
-        self.emb_length = 512
-        self.max_prompt_len = 7
-        self.output_length = inner_context_size
-
-        self.alphabet_size = alphabet_size
-
-        self.embeddings_layer = nn.Embedding(num_embeddings=self.alphabet_size, embedding_dim=self.emb_length)
+        self.embeddings_layer = nn.Embedding(
+            alphabet_size,
+            text_emb_dim,
+            padding_idx=0
+        )
 
         self.encoder = nn.Sequential(
-            nn.Linear(self.emb_length * self.max_prompt_len, self.middle_dim),
+            nn.Linear(text_emb_dim, inner_context_size),
             nn.ReLU(),
-            nn.Linear(self.middle_dim, self.middle_dim),
+            nn.Linear(inner_context_size, inner_context_size),
             nn.ReLU(),
-            nn.LayerNorm(self.middle_dim),
-            nn.Linear(self.middle_dim, self.output_length),
+            nn.LayerNorm(inner_context_size),
+            nn.Linear(inner_context_size, output_dim),
         )
 
     def forward(self, x):
-        if x.size(1) < self.max_prompt_len:
-            pad = torch.zeros(x.size(0), self.max_prompt_len - x.size(1), dtype=torch.long, device=x.device)
-            x = torch.cat([x, pad], dim=1)
-        else:
-            x = x[:, :self.max_prompt_len]
         x = self.embeddings_layer(x)
-        x = x.view(x.size(0), -1)
-
         x = self.encoder(x)
         return x
