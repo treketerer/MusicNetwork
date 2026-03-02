@@ -24,6 +24,8 @@
 *   **Post-processing**: Автоматическое наложение эффекта реверберации (Reverb) через библиотеку `pedalboard` для придания "объема" звучанию.
 *   **Интерактивный UI**: Полноценный веб-интерфейс на **Gradio** с настройками генерации.
 
+---
+
 **🖼️ Изображение Gradio интерфейса**
 ![img.png](data/git/img.png)
 
@@ -76,7 +78,7 @@
 ---
 
 ### 📈 Обучение
-Модель была обучена на больших объемах данных через IterableDataset. Обучалась на 220+ тысячах midi файлов из [MAESTRO MIDI dataset]("https://magenta.tensorflow.org/datasets/maestro").
+Модель была обучена на больших объемах данных через IterableDataset. Обучалась на 220+ тысячах midi файлов из [Godzilla-Piano MIDI Dataset](https://huggingface.co/datasets/projectlosangeles/Godzilla-MIDI-Dataset).
 * **Loss Function**: CrossEntropyLoss.
 * **Optimizer**: Adam (LR: 0.0005).
 * **Batch Size**: 64 (Накопление градиента в угоду GPU памяти).
