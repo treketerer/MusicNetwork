@@ -35,15 +35,15 @@ paths = {
     "local_models": "./models"
 }
 
-data_path = paths.get("kaggle_dataset")
-model_input_path = paths.get("kaggle_input_models")
-model_output_path = paths.get("kaggle_output_models")
+data_path = paths.get("local")
+model_input_path = paths.get("local_models")
+model_output_path = paths.get("local_models")
 
-NEED_TO_LEARN = True
+NEED_TO_LEARN = False
 LOAD_LEARNED_MODEL = True
-SAVED_MODEL_PATH = f"{model_input_path}/135089_music_model_4_final.pth"
+SAVED_MODEL_PATH = f"{model_input_path}/135089_music_model_6_final.pth"
 
-SOUND_FONT_PATH = "./data/soundfonts/FluidR3_GM.sf2"
+SOUND_FONT_PATH = "./data/soundfonts/SGM-V2.01.sf2"
 
 # LOGIC START
 

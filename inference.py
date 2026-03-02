@@ -41,8 +41,9 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
 
     with torch.no_grad():
         backloop_vec = None
+        cond_h, cond_c = None, None
         for _ in tqdm(range(output_tacts_count)):
-            tact_data, backloop_vec = model(words_tensor, instruments_tensor, backloop_vec=backloop_vec, temperature=temperature, short_notes_coef=short_notes_coef, top_k=top_k)
+            tact_data, backloop_vec, cond_h, cond_c = model(words_tensor, instruments_tensor, backloop_vec=backloop_vec, temperature=temperature, short_notes_coef=short_notes_coef, top_k=top_k, conductor_h=cond_h, conductor_c=cond_c)
             # print("INF backloop_vec", backloop_vec.shape)
             tacts.append(tact_data)
 

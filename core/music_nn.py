@@ -114,7 +114,7 @@ class MusicNN(nn.Module):
 #         print(notes_logits.shape, instruments_logits.shape)
         return notes_logits, instruments_logits
 
-    def use_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, backloop_vec = None, h0=None, c0=None, max_tokens=35, temperature=0.9, short_notes_coef=0.75, top_k=50):
+    def use_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, backloop_vec = None, max_tokens=35, temperature=0.9, short_notes_coef=0.75, top_k=50, conductor_h=None, conductor_c=None):
         device = next(self.parameters()).device
 
         # Получение половины вектора для инструментов
@@ -134,7 +134,7 @@ class MusicNN(nn.Module):
 #         print("input_vector", input_vector.shape)
 
         # Прогон через дирижера, получение предсказания инструментов
-        conductor_h, hn, cn = self.conductor_lstm(input_vector)
+        conductor_h, cond_h, cond_c = self.conductor_lstm(input_vector, h0=conductor_h, c0=conductor_c)
 #         print("conductor_h", conductor_h.shape)
         instruments_logits = self.conductor_need_instruments_parser(conductor_h)
 #         print("instruments_logits", instruments_logits.shape)
@@ -145,9 +145,11 @@ class MusicNN(nn.Module):
 
         instruments_probs = torch.sigmoid(instruments_logits)
 
-        threshold = 0.35
+        # print(instruments_probs)
+        threshold = 0.65
         active_mask = instruments_probs > threshold
         instruments_indices = torch.where(active_mask)[1]
+        print(instruments_indices)
 #         print("INST", instruments_indices)
 
         hn, cn = None, None
@@ -161,23 +163,24 @@ class MusicNN(nn.Module):
 
         current_tact_data = [[1] for i in range(len(instruments_indices))]
         finished_instruments = [False] * len(instruments_indices)
+        last_tokens = torch.ones((len(instruments_indices), 1), dtype=torch.long).to(device)
 
         for i in range(max_tokens):
 #             print("current_tact_data", current_tact_data)
-            tact_data_tensor = torch.tensor(current_tact_data, dtype=torch.long).to(device)
-            tact_data_tensor = tact_data_tensor.unsqueeze(0).unsqueeze(0)
+            last_notes_data_tensor = last_tokens.unsqueeze(0).unsqueeze(0)
 
 #             print(conductor_h.shape, instruments_conductor_vectors.shape, tact_data_tensor.shape)
-            notes_logits, hn, cn = self.instruments_lstm(conductor_h, instruments_conductor_vectors, tact_data_tensor, h0=hn, c0=cn)
+            notes_logits, hn, cn = self.instruments_lstm(conductor_h, instruments_conductor_vectors, last_notes_data_tensor, h0=hn, c0=cn)
 
             for inst_idx in range(len(instruments_indices)):
                 if finished_instruments[inst_idx]:
                     current_tact_data[inst_idx].append(0)
+                    last_tokens[inst_idx] = 0
                     continue
 
                 next_token_logits = notes_logits[0, 0, inst_idx, -1, :].flatten()
                 next_token_logits = next_token_logits / temperature
-                next_token_logits[110:130] /= (2 - short_notes_coef)
+                # next_token_logits[110:130] /= (2 - short_notes_coef)
 
                 next_token_logits = torch.nan_to_num(next_token_logits, nan=0.0, posinf=10.0, neginf=-10.0)
 
@@ -192,6 +195,7 @@ class MusicNN(nn.Module):
 
                 if not finished_instruments[inst_idx]:
                     current_tact_data[inst_idx].append(next_token)
+                    last_tokens[inst_idx] = next_token
                 if next_token == 2 or i == max_tokens:
                     finished_instruments[inst_idx] = True
 
@@ -201,17 +205,17 @@ class MusicNN(nn.Module):
             clean_notes = [n for n in current_tact_data[i] if n != 0]
             final_tact_data[instrument] = clean_notes
 
-        emb = self.instruments_lstm.midi_embeddings(torch.tensor(current_tact_data))
+        emb = self.instruments_lstm.midi_embeddings(torch.tensor(current_tact_data)).to(device)
         sum_notes = emb.unsqueeze(0).unsqueeze(0)
         backloop_vector = self.backloop_encoder(sum_notes)
         backloop_vector = backloop_vector.squeeze(0)
-        return final_tact_data, backloop_vector
+        return final_tact_data, backloop_vector, cond_h, cond_c
 
 
-    def forward(self, prompt_idx:torch.Tensor, full_instr_list:torch.Tensor, tacts_instr:torch.Tensor = None, tacts_data:torch.Tensor = None, backloop_vec = None, h0 = None, c0 = None, temperature=0.9, short_notes_coef=0.75, top_k=50):
+    def forward(self, prompt_idx:torch.Tensor, full_instr_list:torch.Tensor, tacts_instr:torch.Tensor = None, tacts_data:torch.Tensor = None, backloop_vec = None, temperature=0.9, short_notes_coef=0.75, top_k=50, conductor_h=None, conductor_c=None):
         if self.is_training:
             tact_data, instruments_logits = self.learn_nn(prompt_idx, full_instr_list, tacts_instr, tacts_data)
             return tact_data, instruments_logits
         else:
-            tact_data, backloop_vector = self.use_nn(prompt_idx, full_instr_list, backloop_vec=backloop_vec, h0=h0, c0=c0, temperature=temperature, short_notes_coef=short_notes_coef, top_k=top_k)
-            return tact_data, backloop_vector
+            tact_data, backloop_vector, cond_h, cond_c = self.use_nn(prompt_idx, full_instr_list, backloop_vec=backloop_vec, temperature=temperature, short_notes_coef=short_notes_coef, top_k=top_k, conductor_h=conductor_h, conductor_c=conductor_c)
+            return tact_data, backloop_vector, cond_h, cond_c
