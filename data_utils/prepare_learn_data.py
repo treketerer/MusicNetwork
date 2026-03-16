@@ -4,6 +4,8 @@ import os
 import re
 from collections import Counter
 
+from numpy.ma.core import equal
+
 from data.keywords import all_translations
 from metaparser import get_captions_tags
 from multiprocessing import cpu_count
@@ -48,31 +50,6 @@ def init_worker():
     # Создаем конфиг внутри процесса
     config = TokenizerConfig(num_velocities=16, use_chords=True, use_programs=True)
     worker_tokenizer = REMI(config)
-
-def get_midi_prompt(prompts_tags):
-    midi_prompt = {}
-    # with open('../data/midi_prompt_meta_keys.jsonl', 'r', encoding='utf-8') as f:
-    print(len(prompts_tags))
-    for i, items in enumerate(prompts_tags):
-        track = items.get('md5')
-        keys = items.get('prompt_keys')
-        prompt_keys = keys.replace("_"," ").split()
-        instruments_arr = json.loads(keys[keys.index("inst:")+5:])
-        random.shuffle(prompt_keys)
-
-        exit_prompt = []
-
-        for key in prompt_keys:
-            prompt_form = ""
-            if key in all_translations:
-                prompt_form = random.choice(all_translations[key])
-            exit_prompt.append(prompt_form)
-        midi_prompt[track] = (track, ' '.join(exit_prompt).lower(), instruments_arr)
-
-        if i % 1000000 == 0:
-            print(f"{i}/{len(prompts_tags)}")
-
-    return midi_prompt
 
 def init_alphabets():
     alphabet_words = set()
@@ -185,6 +162,8 @@ def process_single_midi(data: list):
 
 class CsvParser:
     def __init__(self):
+        self.artists_ban_list = {'Trad'}
+
         maxInt = sys.maxsize
         while True:
             try:
@@ -193,15 +172,22 @@ class CsvParser:
             except OverflowError:
                 maxInt = int(maxInt / 10)
 
-        self.counter = Counter()
+        self.styles_counter = Counter()
+        self.artists_counter = Counter()
+
+        self.tempo_re = re.compile(r'qpm=([\d.]+)')
+
+        self.sorted_translation = sorted(list(all_translations.keys()), key=len, reverse=True)
 
         for i, line in enumerate(self.read_file('../data/meta/GigaMIDI-Dataset.csv')):
             if self.is_raw_valid(line):
-                self.get_music_tokens(line)
-                if i % 100000 == 0:
-                    print(i)
-        print(self.counter)
-
+                tags = self.get_music_tokens(line)
+                prompt = self.get_midi_prompt(tags)
+                print(len(prompt), len(tags), prompt, tags)
+            if i % 200000 == 0:
+                print(i)
+        # print(self.styles_counter)
+        # print(self.artists_counter)
 
     def is_raw_valid(self, row: dict):
         if (len(row['music_style_scraped']) == 0 or
@@ -217,15 +203,24 @@ class CsvParser:
 
         music_style_raw = unquote(str(row['music_style_scraped']))
         music_styles_tags = music_style_raw.split(',')
-        self.counter.update(music_styles_tags)
+        self.styles_counter.update(music_styles_tags)
 
         artist = str(row['artist'])
+        artist = ( artist
+                  .replace('\n', ' ')
+                  .replace(",", "")
+                  .replace(".", "")
+                  .replace(" ", "-")
+                  .replace("'", "") )
+        # artist = artist.encode('ascii', 'ignore').decode('ascii')  # удалит ударения (á -> a) и BOM
+
+        self.artists_counter.update([artist])
 
         avg_velocity = float(row['avg_velocity']) # 68.2734375
         drums_type = str(row['Type']) # no-drums drums-only all-instruments-with-drums
 
         tempo_info = str(row['tempo']) #Tempo(time=0, qpm=118.99992463338107, mspq=504202, ttype='Tick')
-        tempo_search = re.search(r'qpm=([\d.]+)', tempo_info)
+        tempo_search = self.tempo_re.search(tempo_info)
         tempo = tempo_search.group(0).split("=")[1] if tempo_search is not None else -1
         tempo_val = float(tempo)
 
@@ -264,9 +259,37 @@ class CsvParser:
         else:
             note_durations_tag = "long-legato-notes"
 
-        prompt_tags = f'{artist.replace(",", "").replace(" ", "-")} {velocity_tag} {tempo_tag} {note_durations_tag} {drums_type} {" ".join(music_styles_tags)}'
+        prompt_tags = [
+            velocity_tag,
+            tempo_tag,
+            note_durations_tag,
+            drums_type,
+            *music_styles_tags
+        ]
+        if artist not in self.artists_ban_list:
+            prompt_tags.append(artist)
 
-        return prompt_tags
+        filtered_tags = [item for item in prompt_tags if random.randint(0, 10) > 2]
+
+        if len(filtered_tags) < 2:
+            filtered_tags = prompt_tags
+
+        return filtered_tags
+
+    def get_midi_prompt(self, prompt_tags: list):
+        random.shuffle(prompt_tags)
+        exit_prompt = []
+        for i, tag in enumerate(prompt_tags):
+            clean_tag = tag.replace("-", " ").lower()
+
+            if clean_tag in self.sorted_translation:
+                exit_prompt.append(random.choice(all_translations[clean_tag]))
+            else:
+                parts = clean_tag.split()
+                for part in parts:
+                    if part in self.sorted_translation:
+                        exit_prompt.append( random.choice(all_translations[part]) )
+        return exit_prompt
 
     # '../data/meta/GigaMIDI-Dataset.csv'
     def read_file(self, path):
