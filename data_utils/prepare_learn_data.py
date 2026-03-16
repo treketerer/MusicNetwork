@@ -2,7 +2,7 @@ import json
 import random
 import os
 import re
-from typing import Counter
+from collections import Counter
 
 from data.keywords import all_translations
 from metaparser import get_captions_tags
@@ -193,9 +193,15 @@ class CsvParser:
             except OverflowError:
                 maxInt = int(maxInt / 10)
 
+        self.counter = Counter()
+
         for i, line in enumerate(self.read_file('../data/meta/GigaMIDI-Dataset.csv')):
             if self.is_raw_valid(line):
-                print(self.get_music_tokens(line))
+                self.get_music_tokens(line)
+                if i % 100000 == 0:
+                    print(i)
+        print(self.counter)
+
 
     def is_raw_valid(self, row: dict):
         if (len(row['music_style_scraped']) == 0 or
@@ -211,6 +217,7 @@ class CsvParser:
 
         music_style_raw = unquote(str(row['music_style_scraped']))
         music_styles_tags = music_style_raw.split(',')
+        self.counter.update(music_styles_tags)
 
         artist = str(row['artist'])
 
