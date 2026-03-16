@@ -21,6 +21,7 @@ import csv
 
 from urllib.parse import unquote
 
+
 # Сначала отключаем логирование, ДО любых импортов библиотек обработки
 # os.environ['SYMUSIC_LOG_LEVEL'] = '0' # Иногда 0, parfois OFF, depends on version
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -31,112 +32,125 @@ logging.getLogger("miditok").setLevel(logging.ERROR)
 # --- Глобальная переменная для воркера ---
 worker_tokenizer = None
 
-def init_worker():
-    global worker_tokenizer
+class MidiParser:
+    def parse_midi_tokens(self, parsed_midi_meta: list[tuple]):
+        print(len(parsed_midi_meta))
 
-    # --- БЛОК ПОДАВЛЕНИЯ ВЫВОДА ---
-    # Открываем "null" устройство (в никуда)
-    devnull = open(os.devnull, 'w')
+        to_process: list[tuple] = []
 
-    # Перенаправляем stdout и stderr текущего процесса в null
-    # Мы сохраняем оригинальные дескрипторы, если вдруг понадобятся (но в worker'е они не нужны)
-    try:
-        os.dup2(devnull.fileno(), sys.stdout.fileno())
-        os.dup2(devnull.fileno(), sys.stderr.fileno())
-    except Exception:
-        pass
+        processed_midi = set()
 
-    """Инициализация токенизатора один раз для каждого процесса"""
-    # Создаем конфиг внутри процесса
-    config = TokenizerConfig(num_velocities=16, use_chords=True, use_programs=True)
-    worker_tokenizer = REMI(config)
+        if os.path.exists("../data/parsed_midi.jsonl"):
+            with open("../data/parsed_midi.jsonl", "r", encoding="utf-8") as f:
+                for line in f:
+                    line_data = json.loads(line)
+                    md5 = line_data.get('md5')
+                    if md5 is not None:
+                        processed_midi.add(md5)
 
-def init_alphabets():
-    alphabet_words = set()
+        for track in parsed_midi_meta:
+            md5 = track[0]
+            if md5 not in processed_midi:
+                to_process.append(track)
 
-    for key, values in all_translations.items():
-        alphabet_words.add(key.lower())
-        value_words = " ".join(values).split()
-        for word in value_words:
-            alphabet_words.add(word.lower())
-    alphabet_words.add("<unk>")
+        total_files = len(to_process)
+        print(f"К обработке: {len(to_process)} файлов")
 
-    alph_list = list(alphabet_words)
-    alph_list.sort()
+        workers = max(1, cpu_count() - 1)
 
-    alph_dict = dict(enumerate(alph_list))
-    reverse_alph_dict = {v: k for k, v in alph_dict.items()}
+        with open("../data/parsed_midi.jsonl", "a", encoding="utf-8") as f:
+            with concurrent.futures.ProcessPoolExecutor(max_workers=workers, initializer=self.init_worker) as executor:
+                results_iterator = executor.map(self.process_single_midi, to_process, chunksize=12)
 
-    with open("../data/words_alphabet.jsonl", "w", encoding="utf-8") as f:
-        f.write(json.dumps(alph_dict, ensure_ascii=False) + "\n")
-        f.write(json.dumps(reverse_alph_dict, ensure_ascii=False) + "\n")
+                for i, result in enumerate(results_iterator):
+                    if result:
+                        f.write(json.dumps(result) + "\n")
 
-    config = TokenizerConfig(num_velocities=16, use_chords=True, use_programs=True)
-    tokenizer = REMI(config)
-    vocab = tokenizer.vocab
-    revers_vocab = dict(zip(vocab.values(), vocab.keys()))
+                    if i % 1000 == 0:
+                        print(f"Готово: {i}/{total_files} ({(i / total_files) * 100:.2f}%)")
+                        f.flush()
 
-    with open("../data/midi_alphabet.jsonl", "w", encoding="utf-8") as f:
-        f.write(json.dumps(vocab, ensure_ascii=False) + "\n")
-        f.write(json.dumps(revers_vocab, ensure_ascii=False) + "\n")
+    def init_worker(self):
+        global worker_tokenizer
 
-    return alph_list
+        # --- БЛОК ПОДАВЛЕНИЯ ВЫВОДА ---
+        # Открываем "null" устройство (в никуда)
+        devnull = open(os.devnull, 'w')
 
-def parse_tokens_in_ids_arr(ids, start_programs_token: int, now_instrument_id: int):
-    tacts = []
-    tact = {'prepare': []}
+        # Перенаправляем stdout и stderr текущего процесса в null
+        # Мы сохраняем оригинальные дескрипторы, если вдруг понадобятся (но в worker'е они не нужны)
+        try:
+            os.dup2(devnull.fileno(), sys.stdout.fileno())
+            os.dup2(devnull.fileno(), sys.stderr.fileno())
+        except Exception:
+            pass
 
-    for token in ids:
-        # Когда новый такт
-        if token == 4 and len(tact) > 1:
-            for instrument in tact:
-                tact[instrument].append(2)
-                tact[instrument].insert(0, 1)
+        """Инициализация токенизатора один раз для каждого процесса"""
+        # Создаем конфиг внутри процесса
+        config = TokenizerConfig(num_velocities=16, use_chords=True, use_programs=True)
+        worker_tokenizer = REMI(config)
 
-            del tact['prepare']
+    def parse_tokens_in_ids_arr(self, ids, start_programs_token: int, now_instrument_id: int):
+        tacts = []
+        tact = {'prepare': []}
+
+        for token in ids:
+            # Когда новый такт
+            if token == 4 and len(tact) > 1:
+                for instrument in tact:
+                    tact[instrument].append(2)
+                    tact[instrument].insert(0, 1)
+
+                del tact['prepare']
+                tacts.append(tact.copy())
+
+                del tact
+                tact = {}
+                tact['prepare'] = []
+                now_instrument_id = -2
+            if token >= start_programs_token:
+                now_instrument_id = token - start_programs_token
+                print(now_instrument_id)
+
+                if now_instrument_id not in tact:
+                    tact[now_instrument_id] = (tact['prepare']).copy()
+
+            print(token, start_programs_token, token >= start_programs_token)
+            if token >= start_programs_token:
+                continue
+            if now_instrument_id != -2:
+                tact[now_instrument_id].append(token)
+            elif token != 4:
+                tact['prepare'].append(token)
+
+        if len(tact) > 1:
+            if 'prepare' in tact: del tact['prepare']  # если нужно
             tacts.append(tact.copy())
 
-            del tact
-            tact = {}
-            tact['prepare'] = []
-            now_instrument_id = -2
-        if token >= start_programs_token:
-            now_instrument_id = token - start_programs_token
-            print(now_instrument_id)
+        return tacts
 
-            if now_instrument_id not in tact:
-                tact[now_instrument_id] = (tact['prepare']).copy()
+    def process_single_midi(self, track_data: dict):
+        md5, file_path, indexes, instruments, prompt, tags = track_data
+        global worker_tokenizer
 
-        print(token, start_programs_token, token >= start_programs_token)
-        if token >= start_programs_token:
-            continue
-        if now_instrument_id != -2:
-            tact[now_instrument_id].append(token)
-        elif token != 4:
-            tact['prepare'].append(token)
+        start_programs_token = 282
+        now_instrument_id = -2
 
-    if len(tact) > 1:
-        if 'prepare' in tact: del tact['prepare']  # если нужно
-        tacts.append(tact.copy())
+        try:
+            dataset_path = f"../data/GigaMIDI.zip"
 
-    return tacts
+            if not os.path.exists(dataset_path):
+                return {"error": "ZIP_NOT_FOUND", "md5": md5}
 
-def process_single_midi(data: list):
-    md5, _, prompt_idx, instruments_arr = data
-    global worker_tokenizer
+            internal_path = file_path.lstrip("./")
 
-    start_programs_token = 282
-    now_instrument_id = -2
+            with ZipFile(dataset_path, 'r') as myzip:
+                try:
+                    midi_bytes = myzip.read(internal_path)
+                except KeyError:
+                    return {"error": f"FILE_NOT_FOUND_IN_ZIP: {internal_path}", "md5": md5}
 
-    try:
-        path = f"../data/GigaMIDI.zip/"
-        if not os.path.exists(path):
-            return None
-
-        with ZipFile(path) as myzip:
-            with myzip.open('') as midifile:
-
-                midi = Score(midifile.read())
+                midi = Score(midi_bytes)
                 tokens = worker_tokenizer(midi)
                 ids = []
                 if hasattr(tokens, 'ids'):
@@ -151,13 +165,21 @@ def process_single_midi(data: list):
                 if not ids:
                     return {"error": "EMPTY_TOKENS", "md5": md5}
 
-                tacts = parse_tokens_in_ids_arr(ids, start_programs_token, now_instrument_id)
-                json_line = {"md5": md5, "tokens": tacts}
+                tacts = self.parse_tokens_in_ids_arr(ids, start_programs_token, now_instrument_id)
+
+                json_line = {
+                    'file_path': file_path,
+                    "md5": md5,
+                    'prompt': indexes,
+                    'instruments': instruments,
+                    'tacts': tacts,
+                    'prompt_words': prompt,
+                    'prompt_tags': tags
+                }
                 return json_line
 
-    except Exception as e:
-        print(e)
-        return {"error": f"UNHANDLED_EXCEPTION: {e}", "md5": md5}
+        except Exception as e:
+            return {"error": f"ERROR: {str(e)}", "md5": md5}
 
 
 class CsvParser:
@@ -179,15 +201,34 @@ class CsvParser:
 
         self.sorted_translation = sorted(list(all_translations.keys()), key=len, reverse=True)
 
-        for i, line in enumerate(self.read_file('../data/meta/GigaMIDI-Dataset.csv')):
-            if self.is_raw_valid(line):
-                tags = self.get_music_tokens(line)
-                prompt = self.get_midi_prompt(tags)
-                print(len(prompt), len(tags), prompt, tags)
-            if i % 200000 == 0:
-                print(i)
-        # print(self.styles_counter)
-        # print(self.artists_counter)
+
+    def parse_csv(self):
+        prompt_words_indexes = self.init_alphabets()
+
+        all_rows_list: list[tuple] = []
+        counter = 0
+        for i, row in enumerate(self.read_file('../data/meta/GigaMIDI-Dataset.csv')):
+            if self.is_raw_valid(row):
+                tags = self.get_music_tokens(row)
+                prompt, indexes = self.get_midi_prompt(tags, prompt_words_indexes)
+                file_path = str(row['file_path'])
+                md5 = str(row['md5'])
+
+                type = int(row['instrument_category: drums-only: 0, all-instruments-with-drums: 1,no-drums: 2'])
+                if type > 0:
+                    instruments = str(row['NOMML'])
+                else:
+                    instruments = '[128]'
+
+                all_rows_list.append(
+                    ( md5, file_path, indexes, instruments, prompt, tags )
+                )
+
+                counter += 1
+                if counter % 50000 == 0:
+                    print(f"{counter} ({i})", prompt, indexes, tags, file_path, instruments, '', sep="\n")
+
+        return all_rows_list
 
     def is_raw_valid(self, row: dict):
         if (len(row['music_style_scraped']) == 0 or
@@ -198,9 +239,6 @@ class CsvParser:
         return True
 
     def get_music_tokens(self, row):
-        file_path = str(row['file_path'])
-        training_type = file_path.split('/')[2].split('-')[0]  # training-V1.1-80% validation-V1.1-10% test-V1.1-10%
-
         music_style_raw = unquote(str(row['music_style_scraped']))
         music_styles_tags = music_style_raw.split(',')
         self.styles_counter.update(music_styles_tags)
@@ -276,7 +314,7 @@ class CsvParser:
 
         return filtered_tags
 
-    def get_midi_prompt(self, prompt_tags: list):
+    def get_midi_prompt(self, prompt_tags: list, prompt_words_indexes: dict[str, int]) -> tuple[str, list[str]]:
         random.shuffle(prompt_tags)
         exit_prompt = []
         for i, tag in enumerate(prompt_tags):
@@ -289,7 +327,55 @@ class CsvParser:
                 for part in parts:
                     if part in self.sorted_translation:
                         exit_prompt.append( random.choice(all_translations[part]) )
-        return exit_prompt
+
+        prompt = " ".join(exit_prompt)
+
+        indexes_prompt = []
+        for word in prompt.split():
+            if word in prompt_words_indexes:
+                indexes_prompt.append(prompt_words_indexes[word])
+        return prompt, indexes_prompt
+
+    def init_alphabets(self) -> dict[str, int]:
+        words_jsonl = "../data/words_alphabet.jsonl"
+        midi_jsonl = "../data/midi_alphabet.jsonl"
+
+        if os.path.exists(words_jsonl) and os.path.exists(midi_jsonl):
+            with open(words_jsonl, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                if len(lines) >= 2:
+                    return json.loads(lines[1])
+            print("ФАЙЛ АЛФАВИТА ПУСТ!!!")
+
+        alphabet_words = set()
+
+        for key, values in all_translations.items():
+            alphabet_words.add(key.lower())
+            value_words = " ".join(values).split()
+            for word in value_words:
+                alphabet_words.add(word.lower())
+        alphabet_words.add("<unk>")
+
+        alph_list = list(alphabet_words)
+        alph_list.sort()
+
+        alph_dict = dict(enumerate(alph_list))
+        reverse_alph_dict = {v: k for k, v in alph_dict.items()}
+
+        with open(words_jsonl, "w", encoding="utf-8") as f:
+            f.write(json.dumps(alph_dict, ensure_ascii=False) + "\n")
+            f.write(json.dumps(reverse_alph_dict, ensure_ascii=False) + "\n")
+
+        config = TokenizerConfig(num_velocities=16, use_chords=True, use_programs=True)
+        tokenizer = REMI(config)
+        vocab = tokenizer.vocab
+        revers_vocab = dict(zip(vocab.values(), vocab.keys()))
+
+        with open(midi_jsonl, "w", encoding="utf-8") as f:
+            f.write(json.dumps(vocab, ensure_ascii=False) + "\n")
+            f.write(json.dumps(revers_vocab, ensure_ascii=False) + "\n")
+
+        return reverse_alph_dict
 
     # '../data/meta/GigaMIDI-Dataset.csv'
     def read_file(self, path):
@@ -298,78 +384,13 @@ class CsvParser:
             for row in reader:
                 yield row
 
-    #
-    # def parse_midi_tokens(md5_paths, midi_prompts):
-    #     parsed_files = set()
-    #
-    #
-    #
-    #     base_path = "C:/Project/MusicNetwork/midi/"
-    #     to_process = []
-    #
-    #     for md5 in md5_paths:
-    #         if md5 not in parsed_files and os.path.exists(f"{base_path}{md5}.mid"):
-    #             to_process.append((md5, *midi_prompts[md5]))
-    #
-    #     total_files = len(to_process)
-    #     print(f"К обработке: {len(to_process)} файлов")
-    #
-    #     workers = max(1, cpu_count() - 1)
-    #
-    #
-    #
-    #
-    #
-    #
-    #     with open("../data/parsed_midi.jsonl", "a", encoding="utf-8") as f:
-    #         with concurrent.futures.ProcessPoolExecutor(max_workers=workers, initializer=init_worker) as executor:
-    #             results_iterator = executor.map(process_single_midi, to_process, chunksize=10)
-    #
-    #             for i, result in enumerate(results_iterator):
-    #                 if result:
-    #                     f.write(json.dumps(result) + "\n")
-    #
-    #                 if i % 1000 == 0:
-    #                     print(f"Готово: {i}/{total_files} ({(i / total_files) * 100:.2f}%)")
-    #                     f.flush()
-
-
 def main():
     print("ЗАПУЩЕН ПРОЦЕСС ПРЕДПОДГОТОВКИ ДАННЫХ")
-    CsvParser()
-
-
-
-    # all_md5, prompts_tags = get_captions_tags()
-    #
-    # all_md5 = set()
-    # prompts_tags = []
-    # with open("../data/prompt_tags.jsonl", "r", encoding="utf-8") as f:
-    #     for i, line in enumerate(f):
-    #         data = json.loads(line)
-    #         all_md5.add(data.get('md5'))
-    #         # prompts_tags.append(data)
-    #         if i >= 70000:
-    #             break
-    #
-    # print("MIDI ПРОМПТ ТЕГИ ИНИЦИАЛИЗИРОВАНЫ!")
-    #
-    # init_alphabets()
-    # print("АЛФАВИТЫ СЛОВ и MIDI ТЭГОВ ИНИЦИАЛИЗИРОВАНЫ!")
-    #
-    # print("\nЗапущен процесс составления промптов!")
-    # midi_prompts = get_midi_prompt(prompts_tags)
-    # del prompts_tags
-    # print("ПРОМПТЫ СОСТАВЛЕНЫ!")
-    # # save_prompts(midi_prompts)
-    # # print("ПРОМПТЫ СОХРАНЕНЫ В ФАЙЛ!")
-    #
-    # all_md5_list = list(all_md5)[:70000]
-    # del all_md5
-    # print("Запуск токенизации MIDI файлов!")
-    # parse_midi_tokens(all_md5, midi_prompts)
-    # print("MIDI ФАЙЛЫ ТОКЕНИЗИРОВАННЫ!")
-
+    print("\nПарсинг метаданных из CSV файла")
+    metadata = CsvParser().parse_csv()
+    print("\nПарсинг токенов из midi файлов")
+    MidiParser().parse_midi_tokens(metadata)
+    print("Парсинг данных завершен")
 
 if __name__ == "__main__":
     main()
