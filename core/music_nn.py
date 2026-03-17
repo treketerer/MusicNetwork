@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from .encoder_linear import EncoderLinear
+from .text_encoder import TextEncoderGRU
 from .conductor_lstm import ConductorLSTM
 from .instruments_lstm import InstrumentsLSTM
 from .linear_utils import *
@@ -37,7 +37,7 @@ class MusicNN(nn.Module):
              self.instruments_embeddings
         )
 
-        self.encoder_model = EncoderLinear(
+        self.encoder_model = TextEncoderGRU(
             text_alphabet_size,
             self.text_embeddings_size,
             self.inner_context_size,

@@ -21,6 +21,7 @@ import csv
 
 from urllib.parse import unquote
 
+import io
 
 # Сначала отключаем логирование, ДО любых импортов библиотек обработки
 # os.environ['SYMUSIC_LOG_LEVEL'] = '0' # Иногда 0, parfois OFF, depends on version
@@ -31,6 +32,7 @@ logging.getLogger("miditok").setLevel(logging.ERROR)
 
 # --- Глобальная переменная для воркера ---
 worker_tokenizer = None
+worker_zips = {}
 
 class MidiParser:
     def parse_midi_tokens(self, parsed_midi_meta: list[tuple]):
@@ -89,6 +91,7 @@ class MidiParser:
         # Создаем конфиг внутри процесса
         config = TokenizerConfig(num_velocities=16, use_chords=True, use_programs=True)
         worker_tokenizer = REMI(config)
+        worker_zips = {}
 
     def parse_tokens_in_ids_arr(self, ids, start_programs_token: int, now_instrument_id: int):
         tacts = []
@@ -130,53 +133,42 @@ class MidiParser:
         return tacts
 
     def process_single_midi(self, track_data: dict):
-        md5, file_path, indexes, instruments, prompt, tags = track_data
+        md5, path, indexes, instruments, prompt, tags = track_data
         global worker_tokenizer
 
         start_programs_token = 282
         now_instrument_id = -2
 
         try:
-            dataset_path = f"../data/GigaMIDI.zip"
+            if not os.path.exists(path):
+                return None
+            midi = Score(path)
+            tokens = worker_tokenizer(midi)
+            ids = []
+            if hasattr(tokens, 'ids'):
+                ids = tokens.ids
+            elif isinstance(tokens, list):
+                ids = tokens  # Если это уже список
+            elif isinstance(tokens, dict) and 'ids' in tokens:
+                ids = tokens['ids']
+            else:
+                return {"error": f"UNKNOWN_TOKEN_FORMAT: {type(tokens)}", "md5": md5}
 
-            if not os.path.exists(dataset_path):
-                return {"error": "ZIP_NOT_FOUND", "md5": md5}
+            if not ids:
+                return {"error": "EMPTY_TOKENS", "md5": md5}
 
-            internal_path = file_path.lstrip("./")
+            tacts = self.parse_tokens_in_ids_arr(ids, start_programs_token, now_instrument_id)
 
-            with ZipFile(dataset_path, 'r') as myzip:
-                try:
-                    midi_bytes = myzip.read(internal_path)
-                except KeyError:
-                    return {"error": f"FILE_NOT_FOUND_IN_ZIP: {internal_path}", "md5": md5}
-
-                midi = Score(midi_bytes)
-                tokens = worker_tokenizer(midi)
-                ids = []
-                if hasattr(tokens, 'ids'):
-                    ids = tokens.ids
-                elif isinstance(tokens, list):
-                    ids = tokens  # Если это уже список
-                elif isinstance(tokens, dict) and 'ids' in tokens:
-                    ids = tokens['ids']
-                else:
-                    return {"error": f"UNKNOWN_TOKEN_FORMAT: {type(tokens)}", "md5": md5}
-
-                if not ids:
-                    return {"error": "EMPTY_TOKENS", "md5": md5}
-
-                tacts = self.parse_tokens_in_ids_arr(ids, start_programs_token, now_instrument_id)
-
-                json_line = {
-                    'file_path': file_path,
-                    "md5": md5,
-                    'prompt': indexes,
-                    'instruments': instruments,
-                    'tacts': tacts,
-                    'prompt_words': prompt,
-                    'prompt_tags': tags
-                }
-                return json_line
+            json_line = {
+                'file_path': path,
+                "md5": md5,
+                'prompt': indexes,
+                'instruments': instruments,
+                'tacts': tacts,
+                'prompt_words': prompt,
+                'prompt_tags': tags
+            }
+            return json_line
 
         except Exception as e:
             return {"error": f"ERROR: {str(e)}", "md5": md5}
@@ -211,7 +203,14 @@ class CsvParser:
             if self.is_raw_valid(row):
                 tags = self.get_music_tokens(row)
                 prompt, indexes = self.get_midi_prompt(tags, prompt_words_indexes)
-                file_path = str(row['file_path'])
+
+                split_path = str(row['file_path']).split('/')
+
+                data_category = split_path[2].split('-')[0]
+                drums_category = split_path[3]
+
+                path = f"../data/{split_path[1]}/{data_category}-{drums_category}/{'/'.join(split_path[3:])}"
+
                 md5 = str(row['md5'])
 
                 type = int(row['instrument_category: drums-only: 0, all-instruments-with-drums: 1,no-drums: 2'])
@@ -221,12 +220,12 @@ class CsvParser:
                     instruments = '[128]'
 
                 all_rows_list.append(
-                    ( md5, file_path, indexes, instruments, prompt, tags )
+                    ( md5, path, indexes, instruments, prompt, tags )
                 )
 
                 counter += 1
                 if counter % 50000 == 0:
-                    print(f"{counter} ({i})", prompt, indexes, tags, file_path, instruments, '', sep="\n")
+                    print(f"{counter} ({i})", prompt, indexes, tags, path, instruments, '', sep="\n")
 
         return all_rows_list
 
