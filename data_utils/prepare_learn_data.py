@@ -66,7 +66,7 @@ class MidiParser:
 
                 for i, result in enumerate(results_iterator):
                     if result:
-                        f.write(json.dumps(result) + "\n")
+                        f.write(json.dumps(result, ensure_ascii=False) + "\n")
 
                     if i % 1000 == 0:
                         print(f"Готово: {i}/{total_files} ({(i / total_files) * 100:.2f}%)")
@@ -93,14 +93,17 @@ class MidiParser:
         worker_tokenizer = REMI(config)
         worker_zips = {}
 
-    def parse_tokens_in_ids_arr(self, ids, start_programs_token: int, now_instrument_id: int):
+    def parse_tokens_in_ids_arr(self, ids, start_programs_token: int, now_instrument_id: int) -> tuple[list[dict[str, list]], list]:
         tacts = []
         tact = {'prepare': []}
+        instruments = []
 
         for token in ids:
             # Когда новый такт
             if token == 4 and len(tact) > 1:
                 for instrument in tact:
+                    if instrument != 'prepare':
+                        instruments.append(instrument)
                     tact[instrument].append(2)
                     tact[instrument].insert(0, 1)
 
@@ -113,12 +116,10 @@ class MidiParser:
                 now_instrument_id = -2
             if token >= start_programs_token:
                 now_instrument_id = token - start_programs_token
-                print(now_instrument_id)
 
                 if now_instrument_id not in tact:
                     tact[now_instrument_id] = (tact['prepare']).copy()
 
-            print(token, start_programs_token, token >= start_programs_token)
             if token >= start_programs_token:
                 continue
             if now_instrument_id != -2:
@@ -129,11 +130,13 @@ class MidiParser:
         if len(tact) > 1:
             if 'prepare' in tact: del tact['prepare']  # если нужно
             tacts.append(tact.copy())
+            for instrument in tact:
+                instruments.append(instrument)
 
-        return tacts
+        return tacts, list(set(instruments))
 
     def process_single_midi(self, track_data: dict):
-        md5, path, indexes, instruments, prompt, tags = track_data
+        md5, path, indexes, prompt, tags = track_data
         global worker_tokenizer
 
         start_programs_token = 282
@@ -141,7 +144,8 @@ class MidiParser:
 
         try:
             if not os.path.exists(path):
-                return None
+                return {"error": f"PATH NOT FOUND: {path}", "md5": md5}
+
             midi = Score(path)
             tokens = worker_tokenizer(midi)
             ids = []
@@ -157,13 +161,13 @@ class MidiParser:
             if not ids:
                 return {"error": "EMPTY_TOKENS", "md5": md5}
 
-            tacts = self.parse_tokens_in_ids_arr(ids, start_programs_token, now_instrument_id)
+            tacts, instruments_list = self.parse_tokens_in_ids_arr(ids, start_programs_token, now_instrument_id)
 
             json_line = {
                 'file_path': path,
                 "md5": md5,
                 'prompt': indexes,
-                'instruments': instruments,
+                'instruments': instruments_list,
                 'tacts': tacts,
                 'prompt_words': prompt,
                 'prompt_tags': tags
@@ -209,23 +213,23 @@ class CsvParser:
                 data_category = split_path[2].split('-')[0]
                 drums_category = split_path[3]
 
-                path = f"../data/{split_path[1]}/{data_category}-{drums_category}/{'/'.join(split_path[3:])}"
+                path = f"../data/{split_path[1]}/{data_category}-{drums_category}/{'/'.join(split_path[4:])}"
 
                 md5 = str(row['md5'])
 
-                type = int(row['instrument_category: drums-only: 0, all-instruments-with-drums: 1,no-drums: 2'])
-                if type > 0:
-                    instruments = str(row['NOMML'])
-                else:
-                    instruments = '[128]'
+                # type = int(row['instrument_category: drums-only: 0, all-instruments-with-drums: 1,no-drums: 2'])
+                # if type > 0:
+                #     instruments = str(row['NOMML'])
+                # else:
+                #     instruments = '[128]'
 
                 all_rows_list.append(
-                    ( md5, path, indexes, instruments, prompt, tags )
+                    ( md5, path, indexes, prompt, tags )
                 )
 
                 counter += 1
                 if counter % 50000 == 0:
-                    print(f"{counter} ({i})", prompt, indexes, tags, path, instruments, '', sep="\n")
+                    print(f"{counter} ({i})", prompt, indexes, tags, path, '', sep="\n")
 
         return all_rows_list
 
