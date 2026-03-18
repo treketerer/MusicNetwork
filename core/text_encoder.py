@@ -29,5 +29,5 @@ class TextEncoderGRU(nn.Module):
     def forward(self, x):
         x = self.embeddings_layer(x)
         _, h = self.gru(x)
-        x = self.linear(h.squeeze(0))
+        x = self.linear(h[-1])
         return x

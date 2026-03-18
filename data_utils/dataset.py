@@ -195,7 +195,7 @@ class MusicStreamingDataset(IterableDataset):
 
     def parse_data_tensors(self, data):
         res = data.copy()
-        res['idx_prompt'] = torch.tensor(res['idx_prompt'], dtype=torch.long)
+        res['idx_prompt'] = torch.tensor(res['prompt'], dtype=torch.long)
         res['instruments'] = torch.tensor(res['instruments'], dtype=torch.long)
 
         tacts = res.get('tacts')

@@ -33,6 +33,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
     criterion_insts = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(10.0).to(DEVICE))
 
     try:
+        loss_history = []
         for epoch in range(epochs_count):
             train_loader = DataLoader(
                 dataset,
@@ -46,7 +47,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
 
             loop = tqdm(train_loader, leave=False)
             loop.set_description(f"Epoch {epoch}")
-            loss_history = []
+            # loss_history = []
 
             for i, batch in enumerate(loop):
                 prompts = batch.get('idx_prompts').to(DEVICE, non_blocking=True)
@@ -97,20 +98,25 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
 
                     scheduler.step(current_loss.item())
 
-                if i % 3500 == 0 and i > 0:
-                    save_model(model_output_path, save_model_id, f"{epoch}_{i}", model, optimizer, current_loss)
+                # if i % 3500 == 0 and i > 0:
+                #     save_model(model_output_path, save_model_id, f"{epoch}_{i}", model, optimizer, current_loss)
 
             print(f"Эпоха {epoch} завершена!")
-            try:
-                save_model(model_output_path, save_model_id, f"{epoch}_final", model, optimizer, current_loss)
-                plt.clf()
-                plt.plot(loss_history)
-                plt.title(f"Loss Epoch {epoch} {save_model_id}")
-                plt.savefig(f"{model_output_path}/{save_model_id}_loss_epoch_{epoch}.png")  # Сохраняем картинку
-                plt.close()
-            except Exception as ex:
-                save_model(model_output_path, save_model_id, f"{epoch}", model, optimizer, current_loss)
-
+            # try:
+                # save_model(model_output_path, save_model_id, f"{epoch}_final", model, optimizer, current_loss)
+                # plt.clf()
+                # plt.plot(loss_history)
+                # plt.title(f"Loss Epoch {epoch} {save_model_id}")
+                # plt.savefig(f"{model_output_path}/{save_model_id}_loss_epoch_{epoch}.png")  # Сохраняем картинку
+                # plt.close()
+            # except Exception as ex:
+            #     save_model(model_output_path, save_model_id, f"{epoch}", model, optimizer, current_loss)
+        save_model(model_output_path, save_model_id, f"{epoch}_final", model, optimizer, current_loss)
+        plt.clf()
+        plt.plot(loss_history)
+        plt.title(f"Loss Epoch {epoch} {save_model_id}")
+        plt.savefig(f"{model_output_path}/{save_model_id}_loss_epoch_{epoch}.png")  # Сохраняем картинку
+        plt.close()
 
     except Exception as e:
         print(f"\nОшибка во время обучения: {e}")

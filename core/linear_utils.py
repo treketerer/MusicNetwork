@@ -45,7 +45,6 @@ class BackloopEncoder(nn.Module):
             hidden_size=hidden_dim,
             num_layers=1,
             batch_first=True,
-            dropout=0.2,
             bidirectional=False
         )
 

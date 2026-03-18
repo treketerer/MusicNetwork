@@ -84,7 +84,7 @@ class MusicNN(nn.Module):
 #         print("sum instruments_vector", instruments_vector.shape)
         vibe_vector = self.encoder_model(prompt_idx)
 #         print("vibe_vector", vibe_vector.shape)
-        vibe_vector = vibe_vector.sum(dim=1)
+#         vibe_vector = vibe_vector.sum(dim=1)
 #         print("sum vibe_vector", vibe_vector.shape)
         constant_vector = torch.cat((vibe_vector, instruments_vector), dim=1)
 #         print("constant_vector", constant_vector.shape)
@@ -120,7 +120,7 @@ class MusicNN(nn.Module):
         # Получение половины вектора для инструментов
         instruments_vector = self.instruments_linear_parser(full_instr_list).sum(dim=1)
         # print("instruments_vector", instruments_vector.shape)
-        vibe_vector = self.encoder_model(prompt_idx).sum(dim=1)
+        vibe_vector = self.encoder_model(prompt_idx)#.sum(dim=1)
 #         print("vibe_vector", instruments_vector.shape)
         constant_vector = torch.cat((vibe_vector, instruments_vector), dim=1)
 #         print("constant_vector", constant_vector.shape)

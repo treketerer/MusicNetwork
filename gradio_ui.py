@@ -2,7 +2,7 @@ import gradio as gr
 from gradio_xyslider import XYSlider
 from functools import partial
 
-from data import all_translations, prompt_words
+from data.keywords import all_translations, prompt_words
 
 
 def add_to_prompt(now_prompt: str, button_text: str):
