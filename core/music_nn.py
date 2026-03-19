@@ -128,7 +128,7 @@ class MusicNN(nn.Module):
 #       print("input_vector", input_vector.shape)
 
         # Прогон через дирижера, получение предсказания инструментов
-        conductor_h, cond_h, cond_c = self.conductor_lstm(vibe_vector, instruments_vector, backloop_vec, is_training=False, h0=conductor_h, c0=conductor_c)
+        conductor_h, cond_h, cond_c = self.conductor_lstm(vibe_vector, instruments_vector, backloop_vec, h0=conductor_h, c0=conductor_c)
 #         print("conductor_h", conductor_h.shape)
         instruments_logits = self.conductor_need_instruments_parser(conductor_h)
 #         print("instruments_logits", instruments_logits.shape)
@@ -152,7 +152,6 @@ class MusicNN(nn.Module):
         instruments_conductor_vectors = self.instruments_embeddings(instruments_indices)
 #         print("instruments_conductor_vectors", instruments_conductor_vectors.shape)
 
-        conductor_h = conductor_h.unsqueeze(0)
         instruments_conductor_vectors = instruments_conductor_vectors.unsqueeze(0).unsqueeze(0)
 
         current_tact_data = [[1] for i in range(len(instruments_indices))]

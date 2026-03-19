@@ -82,7 +82,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                     target_real.reshape(-1, 129).float()
                 )
 
-                current_loss = loss_notes * 2.5 + loss_inst * 1.0 + loss_style * 0.5
+                current_loss = loss_notes * 1.0 + loss_inst * 1.25 + loss_style * 0.2
                 loss_normalized = current_loss / accumulation_steps
                 loss_normalized.backward()
 
