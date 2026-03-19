@@ -41,7 +41,7 @@ model_output_path = paths.get("local_models")
 
 NEED_TO_LEARN = False
 LOAD_LEARNED_MODEL = True
-SAVED_MODEL_PATH = f"{model_input_path}/135089_music_model_6_final.pth"
+SAVED_MODEL_PATH = f"{model_input_path}/222361_music_model_499_final.pth"
 
 SOUND_FONT_PATH = "./data/soundfonts/SGM-V2.01.sf2"
 

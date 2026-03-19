@@ -35,7 +35,7 @@ class ConductorInstrumentsParser(nn.Module):
     def forward(self, conductor_h):
         x = self.parser(conductor_h)
         return x
-    
+
 class BackloopEncoder(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int, output_dim: int):
         super(BackloopEncoder, self).__init__()
@@ -56,6 +56,7 @@ class BackloopEncoder(nn.Module):
 
     def forward(self, notes_emb):
         # notes_sum_emb - bd, td, nd, ed
+
         bd, td, ind, nd, ed = notes_emb.shape
         rhythm_emb = notes_emb.sum(2)
         parsed = rhythm_emb.view(bd * td, nd, ed)
