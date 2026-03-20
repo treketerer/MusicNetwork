@@ -28,10 +28,10 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
     print(f"Новый запрос:\nprompt: {prompt}\ntemperature: {temperature}\ntop_k: {top_k}\nshort_notes_coef: {short_notes_coef}\noutput_count: {output_tacts_count}")
 
     if not prompt: return None
-    words_idx, instruments_idx = (
-        [1606, 881, 934, 1232, 817, 758, 1759, 374, 358],
-        [128, 33, 25, 27, 30]
-    )#dataset.words_to_idx(prompt.lower())
+    words_idx = [1100, 700, 1458, 944, 1837]
+    instruments_idx = [128, 33, 1, 66, 4, 39, 73, 20, 54, 26, 27, 28]
+    #dataset.words_to_idx(prompt.lower())
+
     print(words_idx, instruments_idx)
     words_tensor = torch.tensor([words_idx], dtype=torch.long).to(DEVICE)
 
@@ -50,6 +50,7 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
             # print("INF backloop_vec", backloop_vec.shape)
             tacts.append(tact_data)
 
+    print(tacts)
     try:
         united_midi_data = []
 

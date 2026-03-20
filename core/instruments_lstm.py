@@ -5,7 +5,7 @@ from torch import tensor
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class InstrumentsLSTM(nn.Module):
-    def __init__(self, input_size: int, hidden_size: int, midi_alphabet_size: int, midi_emb_dim: int):
+    def __init__(self, input_size: int, hidden_size: int, cond_size: int, midi_alphabet_size: int, midi_emb_dim: int):
         super(InstrumentsLSTM, self).__init__()
 
         self.midi_embeddings = nn.Embedding(midi_alphabet_size, midi_emb_dim, padding_idx=0)
@@ -13,6 +13,9 @@ class InstrumentsLSTM(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.layer_dim = 2
+
+        self.h0_linear = nn.Linear(cond_size, self.layer_dim * self.hidden_size)
+        self.c0_linear = nn.Linear(cond_size, self.layer_dim * self.hidden_size)
 
         self.fusion_linear = nn.Linear(self.input_size, self.hidden_size)
         self.lstm = nn.LSTM(
@@ -43,12 +46,23 @@ class InstrumentsLSTM(nn.Module):
         input_flat = input_vec.view(bd * tb * ib, nb, -1)
 
         if h0 is None and c0 is None:
-            h0 = torch.zeros(self.layer_dim, bd * tb * ib, self.hidden_size).to(device)
-            c0 = torch.zeros(self.layer_dim, bd * tb * ib, self.hidden_size).to(device)
+            flat_constant = constant_vector.unsqueeze(2).expand(bd, tb, ib, -1).reshape(bd * tb * ib, -1)
+
+            h0 = self.h0_linear(flat_constant).view(bd * tb * ib, self.layer_dim, self.hidden_size).permute(1, 0, 2).contiguous()
+            c0 = self.c0_linear(flat_constant).view(bd * tb * ib, self.layer_dim, self.hidden_size).permute(1, 0, 2).contiguous()
 
         compressed_vector = self.fusion_linear(input_flat)
 
         out, (hn, cn) = self.lstm(compressed_vector, (h0, c0))
+
+        # out_reshape = out.view(bd * tb, ib, nb, self.hidden_size)
+        # out_for_attn = out_reshape.permute(0, 2, 1, 3).reshape(bd * tb * ib, nb, self.hidden_size)
+        #
+        # attn_output, _ = self.attention_layer(out_for_attn, out_for_attn, out_for_attn)
+        #
+        # out_sum = out + attn_output
+        # out_sum_reshape = out_sum.view(bd * tb, ib, nb, self.hidden_size).permute(0, 2, 1, 3).reshape(bd * tb * ib, nb, self.hidden_size)
+
         logits = self.midi_out(out)
         out_logits = logits.view(bd, tb, ib, nb, -1)
         return out_logits, hn, cn

@@ -60,11 +60,17 @@ class MusicNN(nn.Module):
             nn.ReLU()
         )
 
+        self.cond_size = self.inner_context_size + self.inner_context_size
+        self.instruments_lstm_input_size = (
+                self.cond_size +
+                self.instruments_embedding_size +
+                self.midi_embeddings_size
+        )
 
-        self.instruments_lstm_input_size = self.inner_context_size + self.inner_context_size + self.instruments_embedding_size + self.midi_embeddings_size
         self.instruments_lstm = InstrumentsLSTM(
             self.instruments_lstm_input_size,
             self.inner_context_size,
+            self.cond_size,
             midi_alphabet_size,
             self.midi_embeddings_size
         )
@@ -112,7 +118,7 @@ class MusicNN(nn.Module):
 #         print(notes_logits.shape, instruments_logits.shape)
         return notes_logits, instruments_logits, loss_style
 
-    def use_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, backloop_vec = None, max_tokens=35, temperature=0.9, short_notes_coef=0.75, top_k=50, conductor_h=None, conductor_c=None):
+    def use_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, backloop_vec = None, max_tokens=75, temperature=0.9, short_notes_coef=0.75, top_k=50, conductor_h=None, conductor_c=None):
         device = next(self.parameters()).device
 
         # Получение половины вектора для инструментов
@@ -140,9 +146,9 @@ class MusicNN(nn.Module):
         instruments_probs = torch.sigmoid(instruments_logits)
 
         # print(instruments_probs)
-        threshold = 0.65
+        threshold = 0.7
         active_mask = instruments_probs > threshold
-        instruments_indices = torch.where(active_mask)[1]
+        instruments_indices = torch.where(active_mask)[2]
         print(instruments_indices)
 #         print("INST", instruments_indices)
 
@@ -180,8 +186,8 @@ class MusicNN(nn.Module):
                 threshold = torch.topk(next_token_logits, top_k).values[-1]
                 next_token_logits[next_token_logits < threshold] = -float('Inf')
 
-                if len(current_tact_data[inst_idx]) < 10:  # Хотим минимум 10 токенов
-                    next_token_logits[2] = -float('Inf')
+                # if len(current_tact_data[inst_idx]) < 10:  # Хотим минимум 10 токенов
+                #     next_token_logits[2] = -float('Inf')
 
                 probs = torch.softmax(next_token_logits, dim=-1)
                 next_token = torch.multinomial(probs, num_samples=1).item()

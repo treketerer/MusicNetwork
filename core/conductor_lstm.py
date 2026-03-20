@@ -27,9 +27,12 @@ class ConductorLSTM(nn.Module):
         #         print("constant_vector", constant_vector.shape)
 
         # Получение всех векторов для инструментов
-        zeros = torch.zeros_like(backloop_vectors[:, :1, :])
-        #         print("\nzeros", zeros.shape)
-        backloop_input = torch.cat((zeros, backloop_vectors[:, :-1, :]), dim=1)
+        if backloop_vectors.size(1) > 1:
+            zeros = torch.zeros_like(backloop_vectors[:, :1, :])
+            backloop_input = torch.cat((zeros, backloop_vectors[:, :-1, :]), dim=1)
+        else:
+            backloop_input = backloop_vectors
+
         #         print("backloop_input", backloop_input.shape)
 
         constant_vector = constant_vector.unsqueeze(1).expand(-1, backloop_input.size(dim=1), -1)
