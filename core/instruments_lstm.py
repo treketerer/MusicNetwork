@@ -17,9 +17,9 @@ class InstrumentsLSTM(nn.Module):
         self.h0_linear = nn.Linear(cond_size, self.layer_dim * self.hidden_size)
         self.c0_linear = nn.Linear(cond_size, self.layer_dim * self.hidden_size)
 
-        self.fusion_linear = nn.Linear(self.input_size, self.hidden_size)
+        self.fusion_linear = nn.Linear(self.input_size, self.hidden_size * 2)
         self.lstm = nn.LSTM(
-            input_size=self.hidden_size,
+            input_size=self.hidden_size * 2,
             hidden_size=self.hidden_size,
             num_layers=self.layer_dim,
             batch_first=True,

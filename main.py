@@ -21,9 +21,9 @@ PRINT_COEF = 1
 ACCUMULATION_STEPS = 16
 SCHEDULER_PATIENCE = 150
 
-max_tacts = 15
-max_token_in_tact = 100
-max_instruments = 10
+max_tacts = 25
+max_token_in_tact = 250
+max_instruments = 20
 
 paths = {
     "collab": "/content/data",
@@ -41,7 +41,7 @@ model_output_path = paths.get("local_models")
 
 NEED_TO_LEARN = False
 LOAD_LEARNED_MODEL = True
-SAVED_MODEL_PATH = f"{model_input_path}/390766_music_model_1023_final.pth"
+SAVED_MODEL_PATH = f"{model_input_path}/807356_music_model_1023_final.pth"
 
 SOUND_FONT_PATH = "./data/soundfonts/SGM-V2.01.sf2"
 

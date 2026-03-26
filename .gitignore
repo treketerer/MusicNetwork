@@ -15,3 +15,4 @@ test.py
 *.csv
 GigaMidi/
 *.png
+sequential_test.py

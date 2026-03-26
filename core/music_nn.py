@@ -22,7 +22,7 @@ class MusicNN(nn.Module):
         self.instruments_embedding_size = instruments_embedding_size
 
         self.inner_context_size = inner_context_size
-        self.backloop_output_size = self.inner_context_size
+        self.backloop_output_size = self.inner_context_size * 2
 
         self.instruments_embeddings = nn.Embedding(
             self.instruments_counts + 1,
@@ -118,7 +118,7 @@ class MusicNN(nn.Module):
 #         print(notes_logits.shape, instruments_logits.shape)
         return notes_logits, instruments_logits, loss_style
 
-    def use_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, backloop_vec = None, max_tokens=75, temperature=0.9, short_notes_coef=0.75, top_k=50, conductor_h=None, conductor_c=None):
+    def use_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, backloop_vec = None, max_tokens=300, temperature=0.9, short_notes_coef=0.75, top_k=50, conductor_h=None, conductor_c=None):
         device = next(self.parameters()).device
 
         # Получение половины вектора для инструментов
@@ -195,7 +195,7 @@ class MusicNN(nn.Module):
                 if not finished_instruments[inst_idx]:
                     current_tact_data[inst_idx].append(next_token)
                     last_tokens[inst_idx] = next_token
-                if next_token == 2 or i == max_tokens:
+                if next_token == 2 or i == max_tokens - 1:
                     finished_instruments[inst_idx] = True
 
         final_tact_data = {}

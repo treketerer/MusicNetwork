@@ -55,12 +55,12 @@ class BackloopEncoder(nn.Module):
         )
 
     def forward(self, notes_emb):
-        # notes_sum_emb - bd, td, nd, ed
-
         bd, td, ind, nd, ed = notes_emb.shape
-        rhythm_emb = notes_emb.sum(2)
-        parsed = rhythm_emb.view(bd * td, nd, ed)
 
-        _, h = self.gru(parsed)
-        x = self.linear(h.squeeze(0))
-        return x.view(bd, td, -1)
+        flat_notes = notes_emb.view(bd * td * ind, nd, ed)
+        _, h = self.gru(flat_notes)
+
+        h_reshaped = h.squeeze(0).view(bd, td, ind, -1)
+        tact_context = h_reshaped.mean(dim=2)
+        x = self.linear(tact_context)
+        return x  # [bd, td, output_dim]
