@@ -28,9 +28,7 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
     print(f"Новый запрос:\nprompt: {prompt}\ntemperature: {temperature}\ntop_k: {top_k}\nshort_notes_coef: {short_notes_coef}\noutput_count: {output_tacts_count}")
 
     if not prompt: return None
-    words_idx = [1100, 700, 1458, 944, 1837]
-    instruments_idx = [128, 33, 1, 66, 4, 39, 73, 20, 54, 26, 27, 28]
-    #dataset.words_to_idx(prompt.lower())
+    words_idx, instruments_idx = dataset.words_to_idx(prompt.lower())
 
     print(words_idx, instruments_idx)
     words_tensor = torch.tensor([words_idx], dtype=torch.long).to(DEVICE)
@@ -47,7 +45,6 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
         cond_h, cond_c = None, None
         for _ in tqdm(range(output_tacts_count)):
             tact_data, backloop_vec, cond_h, cond_c = model(words_tensor, instruments_tensor, backloop_vec=backloop_vec, temperature=temperature, short_notes_coef=short_notes_coef, top_k=top_k, conductor_h=cond_h, conductor_c=cond_c)
-            # print("INF backloop_vec", backloop_vec.shape)
             tacts.append(tact_data)
 
     print(tacts)

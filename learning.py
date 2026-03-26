@@ -33,7 +33,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
     criterion_insts = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(10.0).to(DEVICE))
 
     try:
-        loss_history = []
+        global_loss_history = []
         for epoch in range(epochs_count):
             train_loader = DataLoader(
                 dataset,
@@ -47,7 +47,8 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
 
             loop = tqdm(train_loader, leave=False)
             loop.set_description(f"Epoch {epoch}")
-            # loss_history = []
+
+            epoch_loss_history = []
 
             for i, batch in enumerate(loop):
                 prompts = batch.get('idx_prompts').to(DEVICE, non_blocking=True)
@@ -60,7 +61,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                 inp_inst = tacts_instruments.to(DEVICE)
                 target_inst = tacts_instruments.to(DEVICE)
 
-                tact_logits, instruments_logits, loss_style = model(prompts, full_instruments, tacts_instr=inp_inst, tacts_data=inp_tdata)
+                tact_logits, instruments_logits = model(prompts, full_instruments, tacts_instr=inp_inst, tacts_data=inp_tdata)
 
                 """
                 tact_logits - (batch, songs, tacts, notes, note_emb)
@@ -93,35 +94,38 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
 
                     current_lr = optimizer.param_groups[0]['lr']
 
-                    loop.set_postfix(loss=current_loss.item(), loss_inst=loss_inst.item(), loss_notes=loss_notes.item(), style_loss=loss_style.item(), lr=current_lr)
-                    loss_history.append(current_loss.item())
+                    loop.set_postfix(loss=current_loss.item(), loss_inst=loss_inst.item(), loss_notes=loss_notes.item(), lr=current_lr)
+                    epoch_loss_history.append(current_loss.item())
 
-            scheduler.step(current_loss.item())
-
-                # if i % 3500 == 0 and i > 0:
-                #     save_model(model_output_path, save_model_id, f"{epoch}_{i}", model, optimizer, current_loss)
+                if i % 6000 == 0 and i > 0:
+                    save_model(model_output_path, save_model_id, f"{epoch}_{i}", model, optimizer, current_loss)
 
             print(f"Эпоха {epoch} завершена!")
-            # try:
-                # save_model(model_output_path, save_model_id, f"{epoch}_final", model, optimizer, current_loss)
-                # plt.clf()
-                # plt.plot(loss_history)
-                # plt.title(f"Loss Epoch {epoch} {save_model_id}")
-                # plt.savefig(f"{model_output_path}/{save_model_id}_loss_epoch_{epoch}.png")  # Сохраняем картинку
-                # plt.close()
-            # except Exception as ex:
-            #     save_model(model_output_path, save_model_id, f"{epoch}", model, optimizer, current_loss)
-        save_model(model_output_path, save_model_id, f"{epoch}_final", model, optimizer, current_loss)
-        plt.clf()
-        plt.plot(loss_history)
-        plt.title(f"Loss Epoch {epoch} {save_model_id}")
-        plt.savefig(f"{model_output_path}/{save_model_id}_loss_epoch_{epoch}.png")  # Сохраняем картинку
-        plt.close()
+            try:
+                global_loss_history += epoch_loss_history
+
+                avg_epoch_loss = sum(epoch_loss_history) / len(epoch_loss_history)
+                scheduler.step(avg_epoch_loss)
+                print(f"Средний лосс за эпоху: {avg_epoch_loss:.4f}")
+
+                save_model(model_output_path, save_model_id, f"{epoch}_final", model, optimizer, current_loss)
+                save_loss_image(epoch_loss_history, epoch, model_output_path, save_model_id)
+            except Exception as ex:
+                save_model(model_output_path, save_model_id, f"{epoch}", model, optimizer, current_loss)
+
+        save_loss_image(global_loss_history, epoch, model_output_path, save_model_id)
 
     except Exception as e:
         print(f"\nОшибка во время обучения: {e}")
         if current_loss is not None:
             save_model(model_output_path, save_model_id, epoch, model, optimizer, current_loss)
+
+def save_loss_image(loss_history: list, epoch_description: str | int, model_output_path: str, save_model_id: int):
+    plt.clf()
+    plt.plot(loss_history)
+    plt.title(f"Loss Epoch {epoch_description} {save_model_id}")
+    plt.savefig(f"{model_output_path}/{save_model_id}_loss_epoch_{epoch_description}.png")  # Сохраняем картинку
+    plt.close()
 
 def save_model(model_output_path, save_model_id, epoch, model, optimizer, current_loss):
     path = f"{model_output_path}/{save_model_id}_music_model_{epoch}.pth"

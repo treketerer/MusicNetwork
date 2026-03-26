@@ -188,9 +188,9 @@ class MidiParser:
                 "md5": md5,
                 'prompt': indexes,
                 'instruments': instruments_list,
-                'tacts': tacts,
                 'prompt_words': prompt,
-                'prompt_tags': tags
+                'prompt_tags': tags,
+                'tacts': tacts
             }
             return json_line
 

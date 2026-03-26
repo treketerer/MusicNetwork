@@ -5,6 +5,7 @@ import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from sympy import false
 
 from core.music_nn import MusicNN
 from data_utils.dataset import MusicStreamingDataset
@@ -22,7 +23,7 @@ ACCUMULATION_STEPS = 16
 SCHEDULER_PATIENCE = 150
 
 max_tacts = 20
-max_token_in_tact = 100
+max_token_in_tact = 200
 max_instruments = 15
 
 paths = {
@@ -39,9 +40,9 @@ data_path = paths.get("local")
 model_input_path = paths.get("local_models")
 model_output_path = paths.get("local_models")
 
-NEED_TO_LEARN = False
-LOAD_LEARNED_MODEL = True
-SAVED_MODEL_PATH = f"{model_input_path}/809084_music_model_1023_final.pth"
+NEED_TO_LEARN = True
+LOAD_LEARNED_MODEL = False
+SAVED_MODEL_PATH = f"{model_input_path}/719226_music_model_511_final.pth"
 
 SOUND_FONT_PATH = "./data/soundfonts/SGM-V2.01.sf2"
 

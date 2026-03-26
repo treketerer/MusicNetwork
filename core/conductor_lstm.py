@@ -24,7 +24,6 @@ class ConductorLSTM(nn.Module):
 
     def forward(self, vibe_vector, instruments_vector, backloop_vectors, h0=None, c0=None):
         constant_vector = torch.cat((vibe_vector, instruments_vector), dim=1)
-        #         print("constant_vector", constant_vector.shape)
 
         # Получение всех векторов для инструментов
         if backloop_vectors.size(1) > 1:
@@ -33,12 +32,8 @@ class ConductorLSTM(nn.Module):
         else:
             backloop_input = backloop_vectors
 
-        #         print("backloop_input", backloop_input.shape)
-
         constant_vector = constant_vector.unsqueeze(1).expand(-1, backloop_input.size(dim=1), -1)
-        #         print("constant_vector", constant_vector.shape)
         concatenated_vectors = torch.cat((constant_vector, backloop_input), dim=2)
-        # print("\nall_input_vectors", all_input_vectors.shape)
 
         compressed_vector = self.fusion_linear(concatenated_vectors)
 

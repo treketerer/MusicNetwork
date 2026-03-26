@@ -83,80 +83,53 @@ class MusicNN(nn.Module):
 
     def learn_nn(self, prompt_idx:torch.Tensor, full_instr_list:torch.Tensor, tacts_instr:torch.Tensor, tacts_data:torch.Tensor):
         # Прогон через Backloop для получения векторов в начало
-        # print("\nSTART EMBEDDINGS")
         notes_emb = self.instruments_lstm.midi_embeddings(tacts_data)
-#         print("ISNT EMV", tacts_data.shape, notes_emb.shape)
         backloop_vectors = self.backloop_encoder(notes_emb)
-#         print("BACKLOOP", backloop_vectors.shape)
 
         # Получение половины вектора для инструментов
         instruments_vector = self.instruments_linear_parser(full_instr_list)
-#         print("\ninstruments_vector", instruments_vector.shape)
         instruments_vector = instruments_vector.mean(dim=1)
-#         print("sum instruments_vector", instruments_vector.shape)
         vibe_vector = self.encoder_model(prompt_idx)
-#         print("vibe_vector", vibe_vector.shape)
-#         vibe_vector = vibe_vector.sum(dim=1)
-#         print("sum vibe_vector", vibe_vector.shape)
 
         # Прогон через дирижера, получение предсказания инструментов
         conductor_h, hn, cn = self.conductor_lstm(vibe_vector, instruments_vector, backloop_vectors)
-#         print("\nconductor_h", conductor_h.shape)
         instruments_logits = self.conductor_need_instruments_parser(conductor_h)
-#         print("instruments_logits", instruments_logits.shape)
 
         # Функция потеря удержания вайба в h
-        h_projected = self.style_projector(conductor_h)
-        vibe_expanded = vibe_vector.unsqueeze(1).expand(-1, conductor_h.size(1), -1)
-        loss_style = nn.MSELoss()(h_projected, vibe_expanded)
+        # h_projected = self.style_projector(conductor_h)
+        # vibe_expanded = vibe_vector.unsqueeze(1).expand(-1, conductor_h.size(1), -1)
+        # loss_style = nn.MSELoss()(h_projected, vibe_expanded)
 
         # Получение нот
         instruments_conductor_vectors = self.instruments_embeddings(tacts_instr)
-        # print("\nPRE INSTRUMENTS", conductor_h.shape, instruments_conductor_vectors.shape, tacts_data.shape)
         notes_logits, hn, cn = self.instruments_lstm(conductor_h, vibe_vector, instruments_conductor_vectors, tacts_data)
-#         print("notes_logits", notes_logits.shape)
-#         print(notes_logits.shape, instruments_logits.shape)
-        return notes_logits, instruments_logits, loss_style
+        return notes_logits, instruments_logits
 
     def use_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, backloop_vec = None, max_tokens=100, temperature=0.9, short_notes_coef=0.75, top_k=50, conductor_h=None, conductor_c=None):
         device = next(self.parameters()).device
 
         # Получение половины вектора для инструментов
         instruments_vector = self.instruments_linear_parser(full_instr_list).mean(dim=1)
-        # print("instruments_vector", instruments_vector.shape)
         vibe_vector = self.encoder_model(prompt_idx)#.sum(dim=1)
-#         print("vibe_vector", instruments_vector.shape)
         if backloop_vec is None:
             backloop_vec = torch.zeros((1, 1, self.backloop_output_size), device=device)
-#         print("backloop_vec", backloop_vec.shape)
-
-        # Получение всех векторов для инструментов
-#       print("input_vector", input_vector.shape)
 
         # Прогон через дирижера, получение предсказания инструментов
         conductor_h, cond_h, cond_c = self.conductor_lstm(vibe_vector, instruments_vector, backloop_vec, h0=conductor_h, c0=conductor_c)
-#         print("conductor_h", conductor_h.shape)
         instruments_logits = self.conductor_need_instruments_parser(conductor_h)
-#         print("instruments_logits", instruments_logits.shape)
-#         print("instruments_logits", instruments_logits)
 
-        # print(instruments_logits)
         # Получаем самые вероятные инструменты
-
         instruments_probs = torch.sigmoid(instruments_logits)
 
-        # print(instruments_probs)
         threshold = 0.7
         active_mask = instruments_probs > threshold
         instruments_indices = torch.where(active_mask)[2]
         print(instruments_indices)
-#         print("INST", instruments_indices)
 
         hn, cn = None, None
 
         # Получение нот
         instruments_conductor_vectors = self.instruments_embeddings(instruments_indices)
-#         print("instruments_conductor_vectors", instruments_conductor_vectors.shape)
 
         instruments_conductor_vectors = instruments_conductor_vectors.unsqueeze(0).unsqueeze(0)
 
@@ -165,10 +138,7 @@ class MusicNN(nn.Module):
         last_tokens = torch.ones((len(instruments_indices), 1), dtype=torch.long).to(device)
 
         for i in range(max_tokens):
-#             print("current_tact_data", current_tact_data)
             last_notes_data_tensor = last_tokens.unsqueeze(0).unsqueeze(0)
-
-#             print(conductor_h.shape, instruments_conductor_vectors.shape, tact_data_tensor.shape)
             notes_logits, hn, cn = self.instruments_lstm(conductor_h, vibe_vector, instruments_conductor_vectors, last_notes_data_tensor, h0=hn, c0=cn)
 
             for inst_idx in range(len(instruments_indices)):
@@ -213,8 +183,8 @@ class MusicNN(nn.Module):
 
     def forward(self, prompt_idx:torch.Tensor, full_instr_list:torch.Tensor, tacts_instr:torch.Tensor = None, tacts_data:torch.Tensor = None, backloop_vec = None, temperature=0.9, short_notes_coef=0.75, top_k=50, conductor_h=None, conductor_c=None):
         if self.is_training:
-            tact_data, instruments_logits, loss_style = self.learn_nn(prompt_idx, full_instr_list, tacts_instr, tacts_data)
-            return tact_data, instruments_logits, loss_style
+            tact_data, instruments_logits = self.learn_nn(prompt_idx, full_instr_list, tacts_instr, tacts_data)
+            return tact_data, instruments_logits
         else:
             tact_data, backloop_vector, cond_h, cond_c = self.use_nn(prompt_idx, full_instr_list, backloop_vec=backloop_vec, temperature=temperature, short_notes_coef=short_notes_coef, top_k=top_k, conductor_h=conductor_h, conductor_c=conductor_c)
             return tact_data, backloop_vector, cond_h, cond_c
