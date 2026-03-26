@@ -10,7 +10,7 @@ from data.keywords import ban_list, all_translations, all_instruments
 
 class MusicStreamingDataset(IterableDataset):
     def __init__(self, parsed_midi_path, words_alphabet_path, midi_alphabet_path,
-                 buffer_size=256, max_tacts=35, max_token_in_tact=200, max_instruments=15):
+                 buffer_size=256, max_tacts=20, max_token_in_tact=150, max_instruments=15):
 
         self.max_instruments = max_instruments
         self.max_tacts = max_tacts

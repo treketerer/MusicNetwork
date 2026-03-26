@@ -8,7 +8,7 @@ from .model_utils import *
 
 class MusicNN(nn.Module):
     def __init__(self, text_alphabet_size:int, midi_alphabet_size:int,
-            instruments_counts = 129, inner_context_size=768,
+            instruments_counts = 129, inner_context_size=512,
             text_embeddings_size = 256, midi_embeddings_size = 128,
             instruments_embedding_size = 128, learning=True):
 
@@ -22,7 +22,7 @@ class MusicNN(nn.Module):
         self.instruments_embedding_size = instruments_embedding_size
 
         self.inner_context_size = inner_context_size
-        self.backloop_output_size = self.inner_context_size * 2
+        self.backloop_output_size = self.inner_context_size
 
         self.instruments_embeddings = nn.Embedding(
             self.instruments_counts + 1,
@@ -118,7 +118,7 @@ class MusicNN(nn.Module):
 #         print(notes_logits.shape, instruments_logits.shape)
         return notes_logits, instruments_logits, loss_style
 
-    def use_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, backloop_vec = None, max_tokens=300, temperature=0.9, short_notes_coef=0.75, top_k=50, conductor_h=None, conductor_c=None):
+    def use_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, backloop_vec = None, max_tokens=100, temperature=0.9, short_notes_coef=0.75, top_k=50, conductor_h=None, conductor_c=None):
         device = next(self.parameters()).device
 
         # Получение половины вектора для инструментов

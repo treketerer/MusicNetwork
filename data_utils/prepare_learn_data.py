@@ -93,47 +93,67 @@ class MidiParser:
         worker_tokenizer = REMI(config)
         worker_zips = {}
 
-    def parse_tokens_in_ids_arr(self, ids, start_programs_token: int, now_instrument_id: int) -> tuple[list[dict[str, list]], list]:
+    def parse_tokens_in_ids_arr(self, ids, start_programs_token: int, now_instrument_id: int) -> tuple[
+        list[dict[str, list]], list]:
+        global worker_tokenizer
+
+        # 1. Находим токен нулевой позиции
+        pos_0_token = None
+        for k, v in worker_tokenizer.vocab.items():
+            if k == "Position_0/4" or k == "Position_0":
+                pos_0_token = v
+                break
+
+        is_pos_token = {v: k.startswith("Position") for k, v in worker_tokenizer.vocab.items()}
+
         tacts = []
-        tact = {'prepare': []}
-        instruments = []
+        tact = {}
+        instruments = set()
+
+        # Инициализируем нулевой позицией
+        current_position = pos_0_token
+        now_instrument_id = -1
 
         for token in ids:
-            # Когда новый такт
-            if token == 4 and len(tact) > 1:
-                for instrument in tact:
-                    if instrument != 'prepare':
-                        instruments.append(instrument)
-                    tact[instrument].append(2)
-                    tact[instrument].insert(0, 1)
-
-                del tact['prepare']
-                tacts.append(tact.copy())
-
-                del tact
+            if token == 4:
+                if tact:
+                    for inst in tact:
+                        tact[inst].append(2)
+                        tact[inst].insert(0, 1)
+                    tacts.append(tact.copy())
+                    instruments.update(tact.keys())
                 tact = {}
-                tact['prepare'] = []
-                now_instrument_id = -2
+                current_position = pos_0_token  # СБРОС В 0 ПРИ НОВОМ ТАКТЕ
+                now_instrument_id = -1
+                continue
+
+            if is_pos_token.get(token, False):
+                current_position = token
+                continue
+
             if token >= start_programs_token:
                 now_instrument_id = token - start_programs_token
-
                 if now_instrument_id not in tact:
-                    tact[now_instrument_id] = (tact['prepare']).copy()
+                    tact[now_instrument_id] = []
 
-            if token >= start_programs_token:
+                # Теперь даже самая первая нота в такте получит токен времени 0
+                if current_position is not None:
+                    if not tact[now_instrument_id] or tact[now_instrument_id][-1] != current_position:
+                        tact[now_instrument_id].append(current_position)
                 continue
-            if now_instrument_id != -2:
+
+            if now_instrument_id != -1 and now_instrument_id in tact:
                 tact[now_instrument_id].append(token)
-            elif token != 4:
-                tact['prepare'].append(token)
 
-        if len(tact) > 1:
-            if 'prepare' in tact: del tact['prepare']  # если нужно
+        # Сохраняем последний такт (если midi оборвалось без токена 4)
+        if tact:
+            for inst in tact:
+                tact[inst].append(2)
+                tact[inst].insert(0, 1)
             tacts.append(tact.copy())
-            for instrument in tact:
-                instruments.append(instrument)
+            instruments.update(tact.keys())
 
-        return tacts, list(set(instruments))
+        return tacts, list(instruments)
 
     def process_single_midi(self, track_data: dict):
         md5, path, indexes, prompt, tags = track_data
