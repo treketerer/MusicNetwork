@@ -74,7 +74,7 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
 
         # Накладывание эффектов
         audio, sr = sf.read(mp3_path)
-        reverb = Reverb(room_size=0.05)
+        reverb = Reverb(room_size=0.03)
         board = Pedalboard([reverb])
         effected = board(audio, sr)
         sf.write(mp3_path, effected, sr)

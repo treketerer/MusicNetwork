@@ -202,9 +202,9 @@ class MusicStreamingDataset(IterableDataset):
         tacts_len = len(tacts)
 
         if tacts_len > self.max_tacts:
-            # rand_start = random.randint(0, tacts_len - self.max_tacts)
-            # tacts = tacts[rand_start : rand_start+self.max_tacts]
-            tacts = tacts[:self.max_tacts]
+            rand_start = random.randint(0, tacts_len - self.max_tacts)
+            tacts = tacts[rand_start : rand_start+self.max_tacts]
+            # tacts = tacts[:self.max_tacts]
 
         tacts_len = len(tacts)
 

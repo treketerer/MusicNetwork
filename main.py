@@ -13,8 +13,11 @@ from gradio_ui import get_gradio_ui
 from learning import learn_model
 from inference import use_model
 
+# import os
+# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 # CONFIGS
-BATCH_SIZE = 4
+BATCH_SIZE = 2
 LEARNING_RATE = 0.0003
 EPOCHS_COUNT = 2
 BUFFER_SIZE = 1024
@@ -22,8 +25,8 @@ PRINT_COEF = 1
 ACCUMULATION_STEPS = 16
 SCHEDULER_PATIENCE = 150
 
-max_tacts = 20
-max_token_in_tact = 200
+max_tacts = 25
+max_token_in_tact = 150
 max_instruments = 15
 
 paths = {
@@ -40,9 +43,9 @@ data_path = paths.get("local")
 model_input_path = paths.get("local_models")
 model_output_path = paths.get("local_models")
 
-NEED_TO_LEARN = True
-LOAD_LEARNED_MODEL = False
-SAVED_MODEL_PATH = f"{model_input_path}/719226_music_model_511_final.pth"
+NEED_TO_LEARN = False
+LOAD_LEARNED_MODEL = True
+SAVED_MODEL_PATH = f"{model_input_path}/392733_music_model_0_6000.pth"
 
 SOUND_FONT_PATH = "./data/soundfonts/SGM-V2.01.sf2"
 

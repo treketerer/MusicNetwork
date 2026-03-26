@@ -121,7 +121,7 @@ class MusicNN(nn.Module):
         # Получаем самые вероятные инструменты
         instruments_probs = torch.sigmoid(instruments_logits)
 
-        threshold = 0.7
+        threshold = 0.8
         active_mask = instruments_probs > threshold
         instruments_indices = torch.where(active_mask)[2]
         print(instruments_indices)
