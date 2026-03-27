@@ -18,8 +18,8 @@ from inference import use_model
 
 # CONFIGS
 BATCH_SIZE = 2
-LEARNING_RATE = 0.0003
-EPOCHS_COUNT = 2
+LEARNING_RATE = 0.00008
+EPOCHS_COUNT = 1
 BUFFER_SIZE = 1024
 PRINT_COEF = 1
 ACCUMULATION_STEPS = 16
@@ -45,7 +45,7 @@ model_output_path = paths.get("local_models")
 
 NEED_TO_LEARN = False
 LOAD_LEARNED_MODEL = True
-SAVED_MODEL_PATH = f"{model_input_path}/392733_music_model_0_6000.pth"
+SAVED_MODEL_PATH = f"{model_input_path}/998064_music_model_0_final.pth"
 
 SOUND_FONT_PATH = "./data/soundfonts/SGM-V2.01.sf2"
 
