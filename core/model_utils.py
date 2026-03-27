@@ -43,7 +43,7 @@ class BackloopEncoder(nn.Module):
         self.gru = nn.GRU(
             input_size=input_dim,
             hidden_size=hidden_dim,
-            num_layers=1,
+            num_layers=2,
             batch_first=True,
             bidirectional=False
         )
@@ -60,7 +60,9 @@ class BackloopEncoder(nn.Module):
         flat_notes = notes_emb.view(bd * td * ind, nd, ed)
         _, h = self.gru(flat_notes)
 
-        h_reshaped = h.squeeze(0).view(bd, td, ind, -1)
+        h_last_layer = h[-1]
+        h_reshaped = h_last_layer.view(bd, td, ind, -1)
+
         tact_context = h_reshaped.mean(dim=2)
         x = self.linear(tact_context)
         return x  # [bd, td, output_dim]

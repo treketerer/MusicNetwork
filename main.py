@@ -18,7 +18,7 @@ from inference import use_model
 
 # CONFIGS
 BATCH_SIZE = 2
-LEARNING_RATE = 0.00008
+LEARNING_RATE = 0.0005
 EPOCHS_COUNT = 1
 BUFFER_SIZE = 1024
 PRINT_COEF = 1
@@ -26,7 +26,7 @@ ACCUMULATION_STEPS = 16
 SCHEDULER_PATIENCE = 150
 
 max_tacts = 25
-max_token_in_tact = 150
+max_token_in_tact = 180
 max_instruments = 15
 
 paths = {
@@ -43,9 +43,9 @@ data_path = paths.get("local")
 model_input_path = paths.get("local_models")
 model_output_path = paths.get("local_models")
 
-NEED_TO_LEARN = False
-LOAD_LEARNED_MODEL = True
-SAVED_MODEL_PATH = f"{model_input_path}/998064_music_model_0_final.pth"
+NEED_TO_LEARN = True
+LOAD_LEARNED_MODEL = False
+SAVED_MODEL_PATH = f"{model_input_path}/model.pth"
 
 SOUND_FONT_PATH = "./data/soundfonts/SGM-V2.01.sf2"
 
@@ -79,7 +79,7 @@ def main():
     music_model = MusicNN(
         dataset.get_words_alphabet_len(),
         dataset.get_midi_alphabet_len(),
-        129, 512,
+        129, 768,
     256, 256, 512)
 
     print("Модель инициализирована!")

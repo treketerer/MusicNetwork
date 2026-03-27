@@ -35,14 +35,14 @@ def get_gradio_ui(gradio_use_function):
                     input_top_k = gr.Slider(label='Top-K',
                                             info="Число рассматриваемых вариантов ответа, меньше - меньше бреда и скучнее",
                                             value=50, minimum=5, maximum=200, step=5)
-                    input_coef = gr.Slider(label='Коэфициент длительности', info="Коэфициент количества коротких нот",
-                                           value=0.65,
-                                           minimum=0.1,
-                                           maximum=2.0, step=0.05)
+                    # input_coef = gr.Slider(label='Коэфициент длительности', info="Коэфициент количества коротких нот",
+                    #                        value=0.65,
+                    #                        minimum=0.1,
+                    #                        maximum=2.0, step=0.05)
                     input_tokens = gr.Number(label='Число генерируемых тактов', value=10, step=1)
+                    generate_button = gr.Button("Сгенерировать шедевр", variant="primary")
                     generate_prompt_tags(input_prompt)
 
-                    generate_button = gr.Button("Сгенерировать шедевр", variant="primary")
                 with gr.Column(scale=1):
                     out_text = gr.Textbox(label="Распознанный текст")
                     midi_out = gr.File(label='MIDI')
@@ -50,7 +50,7 @@ def get_gradio_ui(gradio_use_function):
 
             generate_button.click(
                 fn=gradio_use_function,
-                inputs=[input_prompt, input_temp, input_top_k, input_coef, input_tokens],
+                inputs=[input_prompt, input_temp, input_top_k, input_tokens],
                 outputs=[out_text, midi_out, output_audio]
             )
 

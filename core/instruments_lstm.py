@@ -5,7 +5,7 @@ from torch import tensor
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class InstrumentsLSTM(nn.Module):
-    def __init__(self, input_size: int, hidden_size: int, cond_size: int, midi_alphabet_size: int, midi_emb_dim: int):
+    def __init__(self, input_size: int, hidden_size: int, cond_size: int, midi_alphabet_size: int, midi_emb_dim: int, instruments_emb_dim: int):
         super(InstrumentsLSTM, self).__init__()
 
         self.midi_embeddings = nn.Embedding(midi_alphabet_size, midi_emb_dim, padding_idx=0)
@@ -16,6 +16,12 @@ class InstrumentsLSTM(nn.Module):
 
         self.h0_linear = nn.Linear(cond_size, self.layer_dim * self.hidden_size)
         self.c0_linear = nn.Linear(cond_size, self.layer_dim * self.hidden_size)
+
+        self.multihead_attn = nn.MultiheadAttention(
+            embed_dim=cond_size + instruments_emb_dim,
+            num_heads=8,
+            batch_first=True
+        )
 
         self.fusion_linear = nn.Linear(self.input_size, self.hidden_size)
         self.lstm = nn.LSTM(
@@ -36,13 +42,25 @@ class InstrumentsLSTM(nn.Module):
         """
 
         bd, tb, ib, nb = tacts_notes.shape
+
+        # Инициализация векторов вайба и дирижера
         vibe_expanded = vibe_vector.unsqueeze(1).expand(-1, tb, -1)
         constant_vector = torch.cat((conductor_context, vibe_expanded), dim=2)
-        notes_vec = self.midi_embeddings(tacts_notes)
-        cond_vec = constant_vector.unsqueeze(2).unsqueeze(3).expand(bd, tb, ib, nb, -1)
-        inst_vec = instruments_emb.unsqueeze(3).expand(bd, tb, ib, nb, -1)
+        cond_vec = constant_vector.unsqueeze(2).expand(bd, tb, ib, -1) # .unsqueeze(3)
+        inst_vec = instruments_emb.expand(bd, tb, ib, -1) # .unsqueeze(3)
 
-        input_vec = torch.cat([cond_vec, inst_vec, notes_vec], dim=-1)
+        # Подготовка для внимания
+        cond_and_inst = torch.cat([cond_vec, inst_vec], dim=-1)
+        cond_and_inst_flat  = cond_and_inst.view(bd * tb, ib, -1)
+
+        # Внимание по инструментам в тактах
+        attn_output, _ = self.multihead_attn(cond_and_inst_flat, cond_and_inst_flat, cond_and_inst_flat )
+        attn_output = cond_and_inst_flat + attn_output
+        attn_output = attn_output.view(bd, tb, ib, 1, -1).expand(-1, -1, -1, nb, -1)
+
+        # Подготовка к lstm
+        notes_vec = self.midi_embeddings(tacts_notes)
+        input_vec = torch.cat([attn_output, notes_vec], dim=-1)
         input_flat = input_vec.view(bd * tb * ib, nb, -1)
 
         if h0 is None and c0 is None:
@@ -54,14 +72,6 @@ class InstrumentsLSTM(nn.Module):
         compressed_vector = self.fusion_linear(input_flat)
 
         out, (hn, cn) = self.lstm(compressed_vector, (h0, c0))
-
-        # out_reshape = out.view(bd * tb, ib, nb, self.hidden_size)
-        # out_for_attn = out_reshape.permute(0, 2, 1, 3).reshape(bd * tb * ib, nb, self.hidden_size)
-        #
-        # attn_output, _ = self.attention_layer(out_for_attn, out_for_attn, out_for_attn)
-        #
-        # out_sum = out + attn_output
-        # out_sum_reshape = out_sum.view(bd * tb, ib, nb, self.hidden_size).permute(0, 2, 1, 3).reshape(bd * tb * ib, nb, self.hidden_size)
 
         logits = self.midi_out(out)
         out_logits = logits.view(bd, tb, ib, nb, -1)

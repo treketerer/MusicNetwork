@@ -45,7 +45,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                 pin_memory=True  # <--- Ускоряет передачу данных
             )
 
-            loop = tqdm(train_loader, leave=False)
+            loop = tqdm(train_loader, leave=False, mininterval=10.0)
             loop.set_description(f"Epoch {epoch}")
 
             epoch_loss_history = []
@@ -61,7 +61,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                 inp_inst = tacts_instruments.to(DEVICE)
                 target_inst = tacts_instruments.to(DEVICE)
 
-                tact_logits, instruments_logits = model(prompts, full_instruments, tacts_instr=inp_inst, tacts_data=inp_tdata)
+                tact_logits, instruments_logits, loss_style = model(prompts, full_instruments, tacts_instr=inp_inst, tacts_data=inp_tdata)
 
                 """
                 tact_logits - (batch, songs, tacts, notes, note_emb)
@@ -83,7 +83,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                     target_real.reshape(-1, 129).float()
                 )
 
-                current_loss = loss_notes * 1.0 + loss_inst * 1.4 # + loss_style * 0.2
+                current_loss = loss_notes * 1.0 + loss_inst * 1.5  + loss_style * 0.15
                 loss_normalized = current_loss / accumulation_steps
                 loss_normalized.backward()
 
@@ -94,7 +94,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
 
                     current_lr = optimizer.param_groups[0]['lr']
 
-                    loop.set_postfix(loss=current_loss.item(), loss_inst=loss_inst.item(), loss_notes=loss_notes.item(), lr=current_lr)
+                    loop.set_postfix(loss=current_loss.item(), loss_inst=loss_inst.item(), loss_notes=loss_notes.item(), loss_style=loss_style.item(), lr=current_lr)
                     epoch_loss_history.append(current_loss.item())
 
                 if i % 14000 == 0 and i > 0:
