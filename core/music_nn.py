@@ -22,7 +22,7 @@ class MusicNN(nn.Module):
         self.instruments_embedding_size = instruments_embedding_size
 
         self.inner_context_size = inner_context_size
-        self.backloop_output_size = self.inner_context_size * 2
+        self.backloop_output_size =  int(self.inner_context_size * 1.5)
 
         self.instruments_embeddings = nn.Embedding(
             self.instruments_counts + 1,
@@ -97,14 +97,14 @@ class MusicNN(nn.Module):
         instruments_logits = self.conductor_need_instruments_parser(conductor_h)
 
         # Функция потеря удержания вайба в h
-        h_projected = self.style_projector(conductor_h)
-        vibe_expanded = vibe_vector.unsqueeze(1).expand(-1, conductor_h.size(1), -1)
-        loss_style = nn.MSELoss()(h_projected, vibe_expanded)
+        # h_projected = self.style_projector(conductor_h)
+        # vibe_expanded = vibe_vector.unsqueeze(1).expand(-1, conductor_h.size(1), -1)
+        # loss_style = nn.MSELoss()(h_projected, vibe_expanded)
 
         # Получение нот
         instruments_conductor_vectors = self.instruments_embeddings(tacts_instr)
         notes_logits, hn, cn = self.instruments_lstm(conductor_h, vibe_vector, instruments_conductor_vectors, tacts_data)
-        return notes_logits, instruments_logits, loss_style
+        return notes_logits, instruments_logits
 
     def use_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, backloop_vec = None, max_tokens=100, temperature=0.9, short_notes_coef=0.75, top_k=50, conductor_h=None, conductor_c=None):
         device = next(self.parameters()).device
@@ -184,8 +184,8 @@ class MusicNN(nn.Module):
 
     def forward(self, prompt_idx:torch.Tensor, full_instr_list:torch.Tensor, tacts_instr:torch.Tensor = None, tacts_data:torch.Tensor = None, backloop_vec = None, temperature=0.9, short_notes_coef=0.75, top_k=50, conductor_h=None, conductor_c=None):
         if self.is_training:
-            tact_data, instruments_logits, loss_style = self.learn_nn(prompt_idx, full_instr_list, tacts_instr, tacts_data)
-            return tact_data, instruments_logits, loss_style
+            tact_data, instruments_logits = self.learn_nn(prompt_idx, full_instr_list, tacts_instr, tacts_data)
+            return tact_data, instruments_logits
         else:
             tact_data, backloop_vector, cond_h, cond_c = self.use_nn(prompt_idx, full_instr_list, backloop_vec=backloop_vec, temperature=temperature, short_notes_coef=short_notes_coef, top_k=top_k, conductor_h=conductor_h, conductor_c=conductor_c)
             return tact_data, backloop_vector, cond_h, cond_c

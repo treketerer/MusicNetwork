@@ -17,7 +17,7 @@ class ConductorLSTM(nn.Module):
             hidden_size=hidden_size,
             num_layers=self.layer_dim,
             batch_first=True,
-            dropout=0.15
+            dropout=0.25
         )
 
         self.linear = nn.Linear(self.hidden_size, self.output_size)

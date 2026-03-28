@@ -20,12 +20,12 @@ tokenizer = REMI(config)
 print("Токенайзер инициализирован!")
 
 # Использование
-def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, temperature: float, top_k: int, short_notes_coef: float, output_tacts_count: int, sound_font: str):
+def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, temperature: float, top_k: int, output_tacts_count: int, sound_font: str):
     model.to(DEVICE)
     model.eval()
     model.is_training = False
 
-    print(f"Новый запрос:\nprompt: {prompt}\ntemperature: {temperature}\ntop_k: {top_k}\nshort_notes_coef: {short_notes_coef}\noutput_count: {output_tacts_count}")
+    print(f"Новый запрос:\nprompt: {prompt}\ntemperature: {temperature}\ntop_k: {top_k}\noutput_count: {output_tacts_count}")
 
     if not prompt: return None
     words_idx, instruments_idx = dataset.words_to_idx(prompt.lower())
@@ -44,7 +44,7 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
         backloop_vec = None
         cond_h, cond_c = None, None
         for _ in tqdm(range(output_tacts_count)):
-            tact_data, backloop_vec, cond_h, cond_c = model(words_tensor, instruments_tensor, backloop_vec=backloop_vec, temperature=temperature, short_notes_coef=short_notes_coef, top_k=top_k, conductor_h=cond_h, conductor_c=cond_c)
+            tact_data, backloop_vec, cond_h, cond_c = model(words_tensor, instruments_tensor, backloop_vec=backloop_vec, temperature=temperature, short_notes_coef=1, top_k=top_k, conductor_h=cond_h, conductor_c=cond_c)
             tacts.append(tact_data)
 
     print(tacts)

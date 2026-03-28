@@ -18,7 +18,7 @@ class InstrumentsLSTM(nn.Module):
         self.c0_linear = nn.Linear(cond_size, self.layer_dim * self.hidden_size)
 
         self.multihead_attn = nn.MultiheadAttention(
-            embed_dim=cond_size + instruments_emb_dim,
+            embed_dim= cond_size + instruments_emb_dim,
             num_heads=8,
             batch_first=True
         )
@@ -29,7 +29,7 @@ class InstrumentsLSTM(nn.Module):
             hidden_size=self.hidden_size,
             num_layers=self.layer_dim,
             batch_first=True,
-            dropout=0.15
+            dropout=0.25
         )
 
         self.midi_out = nn.Linear(self.hidden_size, midi_alphabet_size)
