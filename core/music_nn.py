@@ -85,7 +85,7 @@ class MusicNN(nn.Module):
     def learn_nn(self, prompt_idx:torch.Tensor, full_instr_list:torch.Tensor, tacts_instr:torch.Tensor, tacts_data:torch.Tensor):
         # Прогон через Backloop для получения векторов в начало
         notes_emb = self.instruments_lstm.midi_embeddings(tacts_data)
-        backloop_vectors = self.backloop_encoder(notes_emb)
+        backloop_vectors = self.backloop_encoder(notes_emb, tacts_instr)
 
         # Получение половины вектора для инструментов
         instruments_vector = self.instruments_linear_parser(full_instr_list)
@@ -103,7 +103,7 @@ class MusicNN(nn.Module):
 
         # Получение нот
         instruments_conductor_vectors = self.instruments_embeddings(tacts_instr)
-        notes_logits, hn, cn = self.instruments_lstm(conductor_h, vibe_vector, instruments_conductor_vectors, tacts_data)
+        notes_logits, hn, cn = self.instruments_lstm(conductor_h, vibe_vector, instruments_conductor_vectors, tacts_data, tacts_instr)
         return notes_logits, instruments_logits
 
     def use_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, backloop_vec = None, max_tokens=100, temperature=0.9, short_notes_coef=0.75, top_k=50, conductor_h=None, conductor_c=None):
@@ -131,6 +131,7 @@ class MusicNN(nn.Module):
 
         # Получение нот
         instruments_conductor_vectors = self.instruments_embeddings(instruments_indices)
+        tacts_instr = instruments_indices.unsqueeze(0).unsqueeze(0)
 
         instruments_conductor_vectors = instruments_conductor_vectors.unsqueeze(0).unsqueeze(0)
 
@@ -140,7 +141,7 @@ class MusicNN(nn.Module):
 
         for i in range(max_tokens):
             last_notes_data_tensor = last_tokens.unsqueeze(0).unsqueeze(0)
-            notes_logits, hn, cn = self.instruments_lstm(conductor_h, vibe_vector, instruments_conductor_vectors, last_notes_data_tensor, h0=hn, c0=cn)
+            notes_logits, hn, cn = self.instruments_lstm(conductor_h, vibe_vector, instruments_conductor_vectors, last_notes_data_tensor, tacts_instr, h0=hn, c0=cn)
 
             for inst_idx in range(len(instruments_indices)):
                 if finished_instruments[inst_idx]:
@@ -177,7 +178,7 @@ class MusicNN(nn.Module):
 
         emb = self.instruments_lstm.midi_embeddings(torch.tensor(current_tact_data, device=device)).to(device)
         sum_notes = emb.unsqueeze(0).unsqueeze(0)
-        backloop_vector = self.backloop_encoder(sum_notes)
+        backloop_vector = self.backloop_encoder(sum_notes, tacts_instr)
 
         return final_tact_data, backloop_vector, cond_h, cond_c
 

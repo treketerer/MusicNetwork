@@ -54,7 +54,7 @@ class BackloopEncoder(nn.Module):
             nn.LayerNorm(output_dim)
         )
 
-    def forward(self, notes_emb):
+    def forward(self, notes_emb, tacts_instr: torch.Tensor):
         bd, td, ind, nd, ed = notes_emb.shape
 
         flat_notes = notes_emb.view(bd * td * ind, nd, ed)
@@ -63,6 +63,12 @@ class BackloopEncoder(nn.Module):
         h_last_layer = h[-1]
         h_reshaped = h_last_layer.view(bd, td, ind, -1)
 
-        tact_context = h_reshaped.mean(dim=2)
+        # Макса для неиспользованных инструментов
+        mask = (tacts_instr != 129).float().unsqueeze(-1)
+        sum_context = (h_reshaped * mask).sum(dim=2)
+        # Делим на количество реальных инструментов (избегаем деления на 0)
+        real_counts = mask.sum(dim=2).clamp(min=1.0)
+        tact_context = sum_context / real_counts
+
         x = self.linear(tact_context)
         return x  # [bd, td, output_dim]

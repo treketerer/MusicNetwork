@@ -34,7 +34,7 @@ class InstrumentsLSTM(nn.Module):
 
         self.midi_out = nn.Linear(self.hidden_size, midi_alphabet_size)
 
-    def forward(self, conductor_context: torch.Tensor, vibe_vector: torch.Tensor, instruments_emb: torch.Tensor, tacts_notes: torch.Tensor, h0=None, c0=None):
+    def forward(self, conductor_context: torch.Tensor, vibe_vector: torch.Tensor, instruments_emb: torch.Tensor, tacts_notes: torch.Tensor, tacts_instr: torch.Tensor, h0=None, c0=None):
         """
         conductor_context - (batch, tacts, conductor_out_dim)
         instruments_emb - (batch, tacts, instruments, instruments_emb_dim)
@@ -54,7 +54,14 @@ class InstrumentsLSTM(nn.Module):
         cond_and_inst_flat  = cond_and_inst.view(bd * tb, ib, -1)
 
         # Внимание по инструментам в тактах
-        attn_output, _ = self.multihead_attn(cond_and_inst_flat, cond_and_inst_flat, cond_and_inst_flat )
+        key_padding_mask = (tacts_instr == 129).view(bd * tb, ib)
+        attn_output, _ = self.multihead_attn(
+            cond_and_inst_flat,
+            cond_and_inst_flat,
+            cond_and_inst_flat,
+            key_padding_mask=key_padding_mask
+        )
+
         attn_output = cond_and_inst_flat + attn_output
         attn_output = attn_output.view(bd, tb, ib, 1, -1).expand(-1, -1, -1, nb, -1)
 
