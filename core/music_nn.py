@@ -106,7 +106,7 @@ class MusicNN(nn.Module):
         notes_logits, hn, cn = self.instruments_lstm(conductor_h, vibe_vector, instruments_conductor_vectors, tacts_data, tacts_instr)
         return notes_logits, instruments_logits
 
-    def use_nn(self, prompt_idx:list, full_instr_list:torch.Tensor, backloop_vec = None, max_tokens=100, temperature=0.9, short_notes_coef=0.75, top_k=50, conductor_h=None, conductor_c=None):
+    def use_nn(self, prompt_idx: torch.Tensor, full_instr_list:torch.Tensor, backloop_vec = None, max_tokens=100, temperature=0.9, short_notes_coef=0.75, top_k=50, conductor_h=None, conductor_c=None):
         device = next(self.parameters()).device
 
         # Получение половины вектора для инструментов

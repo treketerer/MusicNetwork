@@ -5,7 +5,6 @@ import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from sympy import false
 
 from core.music_nn import MusicNN
 from data_utils.dataset import MusicStreamingDataset
@@ -80,7 +79,7 @@ def main():
         dataset.get_words_alphabet_len(),
         dataset.get_midi_alphabet_len(),
         129, 768,
-    256, 256, 512)
+    256, 128, 128)
 
     print("Модель инициализирована!")
 
