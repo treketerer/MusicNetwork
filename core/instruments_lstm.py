@@ -51,10 +51,16 @@ class InstrumentsLSTM(nn.Module):
 
         # Подготовка для внимания
         cond_and_inst = torch.cat([cond_vec, inst_vec], dim=-1)
-        cond_and_inst_flat  = cond_and_inst.view(bd * tb, ib, -1)
+        cond_and_inst_flat  = cond_and_inst.reshape(bd * tb, ib, -1)
 
         # Внимание по инструментам в тактах
-        key_padding_mask = (tacts_instr == 129).view(bd * tb, ib)
+        key_padding_mask = (tacts_instr == 129).reshape(bd * tb, ib)
+
+        # Фикс от None
+        bad_rows = key_padding_mask.all(dim=1)
+        if bad_rows.any():
+            key_padding_mask[bad_rows, 0] = False
+
         attn_output, _ = self.multihead_attn(
             cond_and_inst_flat,
             cond_and_inst_flat,
@@ -63,12 +69,12 @@ class InstrumentsLSTM(nn.Module):
         )
 
         attn_output = cond_and_inst_flat + attn_output
-        attn_output = attn_output.view(bd, tb, ib, 1, -1).expand(-1, -1, -1, nb, -1)
+        attn_output = attn_output.reshape(bd, tb, ib, 1, -1).expand(-1, -1, -1, nb, -1)
 
         # Подготовка к lstm
         notes_vec = self.midi_embeddings(tacts_notes)
         input_vec = torch.cat([attn_output, notes_vec], dim=-1)
-        input_flat = input_vec.view(bd * tb * ib, nb, -1)
+        input_flat = input_vec.reshape(bd * tb * ib, nb, -1)
 
         if h0 is None and c0 is None:
             flat_constant = constant_vector.unsqueeze(2).expand(bd, tb, ib, -1).reshape(bd * tb * ib, -1)

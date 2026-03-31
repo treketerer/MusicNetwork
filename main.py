@@ -16,17 +16,17 @@ from inference import use_model
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 # CONFIGS
-BATCH_SIZE = 2
+BATCH_SIZE = 3
 LEARNING_RATE = 0.0003
-EPOCHS_COUNT = 1
-BUFFER_SIZE = 1024
+EPOCHS_COUNT = 2
+BUFFER_SIZE = 512
 PRINT_COEF = 1
 ACCUMULATION_STEPS = 16
-SCHEDULER_PATIENCE = 150
+SCHEDULER_PATIENCE = 5
 
-max_tacts = 22
-max_token_in_tact = 170
-max_instruments = 15
+max_tacts = 10
+max_token_in_tact = 125
+max_instruments = 13
 
 paths = {
     "collab": "/content/data",
@@ -44,7 +44,7 @@ model_output_path = paths.get("local_models")
 
 NEED_TO_LEARN = False
 LOAD_LEARNED_MODEL = True
-SAVED_MODEL_PATH = f"{model_input_path}/483893_music_model_1_56000.pth"
+SAVED_MODEL_PATH = f"{model_input_path}/608366_feat_511.pth"
 
 SOUND_FONT_PATH = "./data/soundfonts/SGM-V2.01.sf2"
 

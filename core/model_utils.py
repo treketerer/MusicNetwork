@@ -62,6 +62,7 @@ class BackloopEncoder(nn.Module):
 
         h_last_layer = h[-1]
         h_reshaped = h_last_layer.view(bd, td, ind, -1)
+        # tact_context = h_reshaped.mean(dim=2)
 
         # Макса для неиспользованных инструментов
         mask = (tacts_instr != 129).float().unsqueeze(-1)

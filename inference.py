@@ -30,6 +30,9 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
     if not prompt: return None
     words_idx, instruments_idx = dataset.words_to_idx(prompt.lower())
 
+    # words_idx = [1628, 1457, 1369, 1424, 1165, 946, 637, 1345, 1305, 1607]
+    # instruments_idx = [128, 36, 88, 27, 29, 30]
+
     print(words_idx, instruments_idx)
     words_tensor = torch.tensor([words_idx], dtype=torch.long).to(DEVICE)
 
