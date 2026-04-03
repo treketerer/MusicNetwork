@@ -16,15 +16,15 @@ from inference import use_model
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 # CONFIGS
-BATCH_SIZE = 2
-LEARNING_RATE = 0.0001
-EPOCHS_COUNT = 1
+BATCH_SIZE = 3
+LEARNING_RATE = 0.00007
+EPOCHS_COUNT = 2
 BUFFER_SIZE = 512
 PRINT_COEF = 1
 ACCUMULATION_STEPS = 16
-SCHEDULER_PATIENCE = 5
+SCHEDULER_PATIENCE = 3
 
-max_tacts = 15
+max_tacts = 10
 max_token_in_tact = 125
 max_instruments = 13
 
