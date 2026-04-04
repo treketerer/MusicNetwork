@@ -17,13 +17,19 @@ class InstrumentsLSTM(nn.Module):
         self.h0_linear = nn.Linear(cond_size, self.layer_dim * self.hidden_size)
         self.c0_linear = nn.Linear(cond_size, self.layer_dim * self.hidden_size)
 
+        attn_size = cond_size + instruments_emb_dim
         self.multihead_attn = nn.MultiheadAttention(
-            embed_dim= cond_size + instruments_emb_dim,
+            embed_dim = attn_size,
             num_heads=8,
             batch_first=True
         )
 
+        self.attn_norm = nn.LayerNorm(attn_size)
+        self.attn_dropout = nn.Dropout(0.1)
+
         self.fusion_linear = nn.Linear(self.input_size, self.hidden_size)
+        self.fusion_norm = nn.LayerNorm(self.hidden_size)
+
         self.lstm = nn.LSTM(
             input_size=self.hidden_size,
             hidden_size=self.hidden_size,
@@ -68,7 +74,9 @@ class InstrumentsLSTM(nn.Module):
             key_padding_mask=key_padding_mask
         )
 
-        attn_output = cond_and_inst_flat + attn_output
+        attn_output = self.attn_norm(cond_and_inst_flat + attn_output)
+        attn_output = self.attn_dropout(attn_output)
+
         attn_output = attn_output.reshape(bd, tb, ib, 1, -1).expand(-1, -1, -1, nb, -1)
 
         # Подготовка к lstm
@@ -83,6 +91,7 @@ class InstrumentsLSTM(nn.Module):
             c0 = self.c0_linear(flat_constant).view(bd * tb * ib, self.layer_dim, self.hidden_size).permute(1, 0, 2).contiguous()
 
         compressed_vector = self.fusion_linear(input_flat)
+        compressed_vector = self.fusion_norm(compressed_vector)
 
         out, (hn, cn) = self.lstm(compressed_vector, (h0, c0))
 

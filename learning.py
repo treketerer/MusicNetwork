@@ -88,7 +88,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                 loss_normalized.backward()
 
                 if (i + 1) % accumulation_steps == 0:
-                    nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                    nn.utils.clip_grad_norm_(model.parameters(), max_norm=3.0)
                     optimizer.step()
                     optimizer.zero_grad()
 
