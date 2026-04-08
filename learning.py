@@ -97,14 +97,14 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                     loop.set_postfix(loss=current_loss.item(), loss_inst=loss_inst.item(), loss_notes=loss_notes.item(), lr=current_lr)
                     local_loss_history.append(current_loss.item())
 
-                if i % 14000 == 0 and i > 0:
-                    save_model(model_output_path, save_model_id, f"{epoch}_{i}", model, optimizer, current_loss)
-
-                    avg_epoch_loss = sum(local_loss_history) / len(local_loss_history)
-                    scheduler.step(avg_epoch_loss)
-                    global_loss_history += [*local_loss_history]
-                    local_loss_history = []
-                    print(f"Средний лосс за срез: {avg_epoch_loss:.4f}")
+                # if i % 14000 == 0 and i > 0:
+                #     save_model(model_output_path, save_model_id, f"{epoch}_{i}", model, optimizer, current_loss)
+                #
+                #     avg_epoch_loss = sum(local_loss_history) / len(local_loss_history)
+                #     scheduler.step(avg_epoch_loss)
+                #     global_loss_history += [*local_loss_history]
+                #     local_loss_history = []
+                #     print(f"Средний лосс за срез: {avg_epoch_loss:.4f}")
 
             print(f"Эпоха {epoch} завершена!")
             try:
@@ -114,13 +114,13 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                 scheduler.step(avg_epoch_loss)
                 print(f"Средний лосс за срез: {avg_epoch_loss:.4f}")
 
-                save_model(model_output_path, save_model_id, f"{epoch}_final", model, optimizer, current_loss)
-                save_loss_image(local_loss_history, epoch, model_output_path, save_model_id)
+                # save_model(model_output_path, save_model_id, f"{epoch}_final", model, optimizer, current_loss)
+                # save_loss_image(local_loss_history, epoch, model_output_path, save_model_id)
             except Exception as ex:
                 save_model(model_output_path, save_model_id, f"{epoch}", model, optimizer, current_loss)
 
         save_loss_image(global_loss_history, epoch, model_output_path, save_model_id)
-        # save_model(model_output_path, save_model_id, f"{epoch}", model, optimizer, current_loss)
+        save_model(model_output_path, save_model_id, f"{epoch}", model, optimizer, current_loss)
 
     except Exception as e:
         print(f"\nОшибка во время обучения: {e}")
