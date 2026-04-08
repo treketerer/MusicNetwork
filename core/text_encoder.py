@@ -22,7 +22,7 @@ class TextEncoderGRU(nn.Module):
 
         self.linear = nn.Sequential(
             nn.Linear(inner_context_size, output_dim),
-            nn.ReLU(),
+            nn.GELU(),
             nn.LayerNorm(output_dim)
         )
 

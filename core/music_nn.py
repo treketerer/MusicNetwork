@@ -57,7 +57,7 @@ class MusicNN(nn.Module):
         )
         self.style_projector = nn.Sequential(
             nn.Linear(self.inner_context_size, self.inner_context_size),
-            nn.ReLU()
+            nn.GELU()
         )
 
         self.cond_size = self.inner_context_size + self.inner_context_size

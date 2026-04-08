@@ -10,7 +10,7 @@ class SongInstrumentsLinearParser(nn.Module):
         self.input_dim = input_dim
         self.parser = nn.Sequential(
             nn.Linear(input_dim, inner_dim),
-            nn.ReLU(),
+            nn.GELU(),
             nn.LayerNorm(inner_dim),
             nn.Linear(inner_dim, output_dim)
         )
@@ -27,7 +27,7 @@ class ConductorInstrumentsParser(nn.Module):
         self.instruments_count = instruments_count
         self.parser = nn.Sequential(
             nn.Linear(h_dim, inner_dim),
-            nn.ReLU(),
+            nn.GELU(),
             nn.LayerNorm(inner_dim),
             nn.Linear(inner_dim, self.instruments_count),
         )
@@ -50,7 +50,7 @@ class BackloopEncoder(nn.Module):
 
         self.linear = nn.Sequential(
             nn.Linear(hidden_dim, output_dim),
-            nn.ReLU(),
+            nn.GELU(),
             nn.LayerNorm(output_dim)
         )
 
@@ -66,10 +66,8 @@ class BackloopEncoder(nn.Module):
 
         # Макса для неиспользованных инструментов
         mask = (tacts_instr != 129).float().unsqueeze(-1)
-        sum_context = (h_reshaped * mask).sum(dim=2)
-        # Делим на количество реальных инструментов (избегаем деления на 0)
-        real_counts = mask.sum(dim=2).clamp(min=1.0)
-        tact_context = sum_context / real_counts
+        h_masked = h_reshaped.masked_fill(mask == 0, -1e9)
+        tact_context, _ = h_masked.max(dim=2)
 
         x = self.linear(tact_context)
         return x  # [bd, td, output_dim]

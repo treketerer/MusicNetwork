@@ -17,21 +17,24 @@ class InstrumentsLSTM(nn.Module):
         self.h0_linear = nn.Linear(cond_size, self.layer_dim * self.hidden_size)
         self.c0_linear = nn.Linear(cond_size, self.layer_dim * self.hidden_size)
 
-        attn_size = cond_size + instruments_emb_dim
+        self.note_dropout = nn.Dropout(0.2)
+
+        self.attn_fusion_linear = nn.Linear(cond_size + instruments_emb_dim, self.hidden_size)
+        self.attn_fusion_act = nn.GELU()
+
         self.multihead_attn = nn.MultiheadAttention(
-            embed_dim = attn_size,
+            embed_dim = self.hidden_size,
             num_heads=8,
             batch_first=True
         )
 
-        self.attn_norm = nn.LayerNorm(attn_size)
+        self.attn_norm = nn.LayerNorm(self.hidden_size)
         self.attn_dropout = nn.Dropout(0.1)
 
-        self.fusion_linear = nn.Linear(self.input_size, self.hidden_size)
-        self.fusion_norm = nn.LayerNorm(self.hidden_size)
+        self.fusion_norm = nn.LayerNorm(self.hidden_size + midi_emb_dim)
 
         self.lstm = nn.LSTM(
-            input_size=self.hidden_size,
+            input_size=self.hidden_size + midi_emb_dim,
             hidden_size=self.hidden_size,
             num_layers=self.layer_dim,
             batch_first=True,
@@ -67,20 +70,23 @@ class InstrumentsLSTM(nn.Module):
         if bad_rows.any():
             key_padding_mask[bad_rows, 0] = False
 
+        fusion_attn_vector = self.attn_fusion_linear(cond_and_inst_flat)
+        fusion_attn_vector = self.attn_fusion_act(fusion_attn_vector)
+
         attn_output, _ = self.multihead_attn(
-            cond_and_inst_flat,
-            cond_and_inst_flat,
-            cond_and_inst_flat,
+            fusion_attn_vector,
+            fusion_attn_vector,
+            fusion_attn_vector,
             key_padding_mask=key_padding_mask
         )
 
-        attn_output = self.attn_norm(cond_and_inst_flat + attn_output)
         attn_output = self.attn_dropout(attn_output)
+        attn_output = self.attn_norm(fusion_attn_vector + attn_output)
 
         attn_output = attn_output.reshape(bd, tb, ib, 1, -1).expand(-1, -1, -1, nb, -1)
 
         # Подготовка к lstm
-        notes_vec = self.midi_embeddings(tacts_notes)
+        notes_vec = self.note_dropout(self.midi_embeddings(tacts_notes))
         input_vec = torch.cat([attn_output, notes_vec], dim=-1)
         input_flat = input_vec.reshape(bd * tb * ib, nb, -1)
 
@@ -90,10 +96,9 @@ class InstrumentsLSTM(nn.Module):
             h0 = self.h0_linear(flat_constant).view(bd * tb * ib, self.layer_dim, self.hidden_size).permute(1, 0, 2).contiguous()
             c0 = self.c0_linear(flat_constant).view(bd * tb * ib, self.layer_dim, self.hidden_size).permute(1, 0, 2).contiguous()
 
-        compressed_vector = self.fusion_linear(input_flat)
-        compressed_vector = self.fusion_norm(compressed_vector)
+        norm_vector = self.fusion_norm(input_flat)
 
-        out, (hn, cn) = self.lstm(compressed_vector, (h0, c0))
+        out, (hn, cn) = self.lstm(norm_vector, (h0, c0))
 
         logits = self.midi_out(out)
         out_logits = logits.view(bd, tb, ib, nb, -1)
