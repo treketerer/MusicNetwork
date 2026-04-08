@@ -50,6 +50,8 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
 
             local_loss_history = []
 
+            save_coef = int(len(loop) / 2.7)
+            print(save_coef)
             for i, batch in enumerate(loop):
                 prompts = batch.get('idx_prompts').to(DEVICE, non_blocking=True)
                 full_instruments = batch.get('instruments').to(DEVICE, non_blocking=True)
@@ -97,7 +99,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                     loop.set_postfix(loss=current_loss.item(), loss_inst=loss_inst.item(), loss_notes=loss_notes.item(), lr=current_lr)
                     local_loss_history.append(current_loss.item())
 
-                if i % 14000 == 0 and i > 0:
+                if i % save_coef == 0 and i > 0:
                     save_model(model_output_path, save_model_id, f"{epoch}_{i}", model, optimizer, current_loss)
 
                     avg_epoch_loss = sum(local_loss_history) / len(local_loss_history)
