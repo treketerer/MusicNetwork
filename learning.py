@@ -29,7 +29,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
     epoch = 0
     current_loss = None
 
-    criterion_notes = nn.CrossEntropyLoss(ignore_index=0, label_smoothing=0.07)
+    criterion_notes = nn.CrossEntropyLoss(ignore_index=0) #, label_smoothing=0.07)
     criterion_insts = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(10.0).to(DEVICE))
 
     try:
@@ -84,7 +84,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                     target_real.reshape(-1, 129).float()
                 )
 
-                current_loss = loss_notes * 1.0 + loss_inst * 1.65
+                current_loss = loss_notes * 1.1 + loss_inst * 1.5
                 loss_normalized = current_loss / accumulation_steps
                 loss_normalized.backward()
 
