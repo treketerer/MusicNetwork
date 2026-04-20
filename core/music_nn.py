@@ -141,7 +141,8 @@ class MusicNN(nn.Module):
 
         for i in range(max_tokens):
             last_notes_data_tensor = last_tokens.unsqueeze(0).unsqueeze(0)
-            notes_logits, hn, cn = self.instruments_lstm(conductor_h, vibe_vector, instruments_conductor_vectors, last_notes_data_tensor, tacts_instr, h0=hn, c0=cn)
+            notes_logits, hn, cn = self.instruments_lstm(conductor_h, vibe_vector, instruments_conductor_vectors,
+                                                         last_notes_data_tensor, tacts_instr, h0=hn, c0=cn)
 
             for inst_idx in range(len(instruments_indices)):
                 if finished_instruments[inst_idx]:
@@ -156,10 +157,19 @@ class MusicNN(nn.Module):
                 next_token_logits = torch.nan_to_num(next_token_logits, nan=0.0, posinf=10.0, neginf=-10.0)
 
                 threshold = torch.topk(next_token_logits, top_k).values[-1]
-                next_token_logits[next_token_logits < threshold] = -float('Inf')
 
-                # if len(current_tact_data[inst_idx]) < 10:  # Хотим минимум 10 токенов
-                #     next_token_logits[2] = -float('Inf')
+                repetition_penalty = 1.1  # Жестко штрафуем за повтор одних и тех же нот
+                past_tokens = current_tact_data[inst_idx]
+
+                for past_token in set(past_tokens):
+                    # Не штрафуем системные токены (тишина, начало, конец, тактовая черта)
+                    if past_token not in [0, 1, 2, 4]:
+                        if next_token_logits[past_token] < 0:
+                            next_token_logits[past_token] *= repetition_penalty
+                        else:
+                            next_token_logits[past_token] /= repetition_penalty
+
+                next_token_logits[next_token_logits < threshold] = -float('Inf')
 
                 probs = torch.softmax(next_token_logits, dim=-1)
                 next_token = torch.multinomial(probs, num_samples=1).item()

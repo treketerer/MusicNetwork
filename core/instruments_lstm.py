@@ -22,11 +22,11 @@ class InstrumentsLSTM(nn.Module):
         self.attn_fusion_linear = nn.Linear(cond_size + instruments_emb_dim, self.hidden_size)
         self.attn_fusion_act = nn.GELU()
 
-        self.multihead_attn = nn.MultiheadAttention(
-            embed_dim = self.hidden_size,
-            num_heads=8,
-            batch_first=True
-        )
+        # self.multihead_attn = nn.MultiheadAttention(
+        #     embed_dim = self.hidden_size,
+        #     num_heads=8,
+        #     batch_first=True
+        # )
 
         self.attn_norm = nn.LayerNorm(self.hidden_size)
         self.attn_dropout = nn.Dropout(0.1)
@@ -73,21 +73,23 @@ class InstrumentsLSTM(nn.Module):
         fusion_attn_vector = self.attn_fusion_linear(cond_and_inst_flat)
         fusion_attn_vector = self.attn_fusion_act(fusion_attn_vector)
 
-        attn_output, _ = self.multihead_attn(
-            fusion_attn_vector,
-            fusion_attn_vector,
-            fusion_attn_vector,
-            key_padding_mask=key_padding_mask
-        )
+        fusion_expanded = fusion_attn_vector.reshape(bd, tb, ib, 1, -1).expand(-1, -1, -1, nb, -1)
 
-        attn_output = self.attn_dropout(attn_output)
-        attn_output = self.attn_norm(fusion_attn_vector + attn_output)
-
-        attn_output = attn_output.reshape(bd, tb, ib, 1, -1).expand(-1, -1, -1, nb, -1)
+        # attn_output, _ = self.multihead_attn(
+        #     fusion_attn_vector,
+        #     fusion_attn_vector,
+        #     fusion_attn_vector,
+        #     key_padding_mask=key_padding_mask
+        # )
+        #
+        # attn_output = self.attn_dropout(attn_output)
+        # attn_output = self.attn_norm(fusion_attn_vector + attn_output)
+        #
+        # attn_output = attn_output.reshape(bd, tb, ib, 1, -1).expand(-1, -1, -1, nb, -1)
 
         # Подготовка к lstm
         notes_vec = self.note_dropout(self.midi_embeddings(tacts_notes))
-        input_vec = torch.cat([attn_output, notes_vec], dim=-1)
+        input_vec = torch.cat([fusion_expanded, notes_vec], dim=-1)
         input_flat = input_vec.reshape(bd * tb * ib, nb, -1)
 
         if h0 is None and c0 is None:
