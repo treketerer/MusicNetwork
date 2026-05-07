@@ -57,8 +57,18 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                 tacts_data = batch.get('tacts_data').to(DEVICE, non_blocking=True)
                 tacts_instruments = batch.get('tacts_instruments').to(DEVICE, non_blocking=True)
 
-                inp_tdata = tacts_data.to(DEVICE)
+                inp_tdata = tacts_data.clone().to(DEVICE)
                 target_tdata = tacts_data.to(DEVICE)
+
+                # снижение teaching forsing
+                noise_probe = 0.10
+                noise_mask = torch.rand(inp_tdata.shape, device=DEVICE) < noise_probe
+                system_tokens_mask = (inp_tdata == 0) | (inp_tdata == 1) | (inp_tdata == 2) | (inp_tdata == 4)
+                noise_mask = noise_mask & (~system_tokens_mask)
+                random_tokens = torch.randint(5, dataset.midi_alphabet_len, inp_tdata.shape, device=DEVICE)
+
+                inp_tdata[noise_mask] = random_tokens[noise_mask]
+
                 inp_inst = tacts_instruments.to(DEVICE)
                 target_inst = tacts_instruments.to(DEVICE)
 
@@ -84,7 +94,7 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                     target_real.reshape(-1, 129).float()
                 )
 
-                current_loss = loss_notes * 1.0 + loss_inst * 1.5
+                current_loss = loss_notes * 1.4 + loss_inst * 1.0
                 loss_normalized = current_loss / accumulation_steps
                 loss_normalized.backward()
 

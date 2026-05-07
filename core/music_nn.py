@@ -156,21 +156,21 @@ class MusicNN(nn.Module):
 
                 next_token_logits = torch.nan_to_num(next_token_logits, nan=0.0, posinf=10.0, neginf=-10.0)
 
-                threshold = torch.topk(next_token_logits, top_k).values[-1]
+                # threshold = torch.topk(next_token_logits, top_k).values[-1]
 
-                repetition_penalty = 1.1  # Жестко штрафуем за повтор одних и тех же нот
-                past_tokens = current_tact_data[inst_idx]
+                # repetition_penalty = 1.1  # Жестко штрафуем за повтор одних и тех же нот
+                # past_tokens = current_tact_data[inst_idx]
+                #
+                # for past_token in set(past_tokens):
+                #     # Не штрафуем системные токены (тишина, начало, конец, тактовая черта)
+                #     if past_token not in [0, 1, 2, 4]:
+                #         if next_token_logits[past_token] < 0:
+                #             next_token_logits[past_token] *= repetition_penalty
+                #         else:
+                #             next_token_logits[past_token] /= repetition_penalty
 
-                for past_token in set(past_tokens):
-                    # Не штрафуем системные токены (тишина, начало, конец, тактовая черта)
-                    if past_token not in [0, 1, 2, 4]:
-                        if next_token_logits[past_token] < 0:
-                            next_token_logits[past_token] *= repetition_penalty
-                        else:
-                            next_token_logits[past_token] /= repetition_penalty
-
-                next_token_logits[next_token_logits < threshold] = -float('Inf')
-
+                # next_token_logits[next_token_logits < threshold] = -float('Inf')
+                #
                 probs = torch.softmax(next_token_logits, dim=-1)
                 next_token = torch.multinomial(probs, num_samples=1).item()
 
