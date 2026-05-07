@@ -20,7 +20,7 @@ tokenizer = REMI(config)
 print("Токенайзер инициализирован!")
 
 # Использование
-def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, temperature: float, top_k: int, output_tacts_count: int, sound_font: str):
+def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, temperature: float, top_k: int, output_tacts_count: int, sound_font: str, backloop_song_vibe: torch.Tensor = None):
     model.to(DEVICE)
     model.eval()
     model.is_training = False
@@ -44,52 +44,80 @@ def use_model(model: MusicNN, dataset: MusicStreamingDataset, prompt: str, tempe
     tacts = []
 
     with torch.no_grad():
-        backloop_vec = None
+        backloop_vec = backloop_song_vibe
         cond_h, cond_c = None, None
         for _ in tqdm(range(output_tacts_count)):
             tact_data, backloop_vec, cond_h, cond_c = model(words_tensor, instruments_tensor, backloop_vec=backloop_vec, temperature=temperature, short_notes_coef=1, top_k=top_k, conductor_h=cond_h, conductor_c=cond_c)
             tacts.append(tact_data)
 
-    print(tacts)
     try:
         united_midi_data = []
 
+        # 1. Посмотрим, какие токены вообще вылетают
+        all_generated_tokens = []
         for tact in tacts:
-            united_midi_data.append(4)
+            for inst in tact:
+                all_generated_tokens.extend(tact[inst])
 
-            for instrument in tact.keys():
-                inst = int(instrument)
-                united_midi_data.append(282+inst)
+        # 2. Собираем MIDI
+        for tact in tacts:
+            united_midi_data.append(4)  # Bar
 
-                for item in tact[instrument]:
-                    if item not in [0, 1, 2, 4]:
-                        united_midi_data.append(item)
+            # Для каждого инструмента в такте пишем: Program -> [его токены]
+            # Токенайзер сам должен понять Position внутри этих токенов.
+            for instrument_id, tokens in tact.items():
+                inst_token = 282 + int(instrument_id)
 
+                # Добавляем инструмент
+                united_midi_data.append(inst_token)
+
+                # Добавляем токены (фильтруем только системные)
+                for t in tokens:
+                    if t not in [0, 1, 2, 4]:
+                        united_midi_data.append(t)
+
+        print(f"Итоговая длина последовательности для декодера: {len(united_midi_data)}")
+
+        # 3. Декодируем
         generated_sequence = tokenizer.decode(united_midi_data)
+
+        total_notes = sum(len(track.notes) for track in generated_sequence.tracks)
+        print(f"Декодер создал MIDI-объект: дорожек={len(generated_sequence.tracks)}, всего нот={total_notes}")
+
+        if total_notes == 0:
+            return "ОШИБКА: Модель сгенерировала пустые ноты. Попробуйте поднять Temperature до 1.2", None, None
+
+        # 4. Сохранение
         file_name = str(uuid.uuid4()).replace('-', '')[:15]
         midi_path = f"./output/midi/{file_name}.mid"
         mp3_path = f"./output/mp3/{file_name}.mp3"
+        os.makedirs("./output/midi", exist_ok=True)
+        os.makedirs("./output/mp3", exist_ok=True)
 
-        generated_sequence.dump_midi(midi_path) # создание midi
-        save_midi_to_mp3(midi_path, mp3_path, sound_font) # сохранение mp3
+        generated_sequence.dump_midi(midi_path)
 
-        print(f"Файл сохранен:\nmidi - {midi_path}\nmp3 - {mp3_path}")
+        # Проверяем, создался ли файл
+        if os.path.exists(midi_path):
+            print(f"MIDI файл создан, размер: {os.path.getsize(midi_path)} байт")
 
-        # Накладывание эффектов
+        save_midi_to_mp3(midi_path, mp3_path, sound_font)
+
+        # Проверяем MP3
+        if not os.path.exists(mp3_path) or os.path.getsize(mp3_path) < 1000:
+            return "ОШИБКА: MP3 не создался или пустой. Проверьте SoundFont и FluidSynth", midi_path, None
+
+        # Эффекты
         audio, sr = sf.read(mp3_path)
-        reverb = Reverb(room_size=0.03)
-        board = Pedalboard([reverb])
-        effected = board(audio, sr)
-        sf.write(mp3_path, effected, sr)
+        board = Pedalboard([Reverb(room_size=0.03)])
+        sf.write(mp3_path, board(audio, sr), sr)
 
-        print("Эффекты наложены!")
+        return f"Успех! Сгенерировано нот: {total_notes}", midi_path, mp3_path
 
-        words_idx = ["<unk>" if x == 0 else x for x in words_idx]
-        return_text = f"{prompt}\nwords: {words_idx}\ninstruments: {instruments_idx}"
-        return return_text, midi_path, mp3_path
     except Exception as e:
-        print(f"Ошибка сохранения MIDI: {e}")
-        return None
+        print(f"Критическая ошибка: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Ошибка: {str(e)}", None, None
 
 def save_midi_to_mp3(midi_path: str, mp3_path: str, sound_font: str) -> str | None:
     try:

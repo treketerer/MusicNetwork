@@ -4,10 +4,7 @@ import os
 import re
 from collections import Counter
 
-from numpy.ma.core import equal
-
 from data.keywords import all_translations
-from metaparser import get_captions_tags
 from multiprocessing import cpu_count
 import concurrent
 
@@ -16,12 +13,9 @@ from symusic import Score
 import logging
 import sys
 
-from zipfile import ZipFile
 import csv
 
 from urllib.parse import unquote
-
-import io
 
 # Сначала отключаем логирование, ДО любых импортов библиотек обработки
 # os.environ['SYMUSIC_LOG_LEVEL'] = '0' # Иногда 0, parfois OFF, depends on version
@@ -93,7 +87,7 @@ class MidiParser:
         worker_tokenizer = REMI(config)
         worker_zips = {}
 
-    def parse_tokens_in_ids_arr(self, ids, start_programs_token: int, now_instrument_id: int) -> tuple[
+    def parse_tokens_in_ids_arr(self, ids, start_programs_token: int) -> tuple[
         list[dict[str, list]], list]:
         global worker_tokenizer
 

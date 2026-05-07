@@ -12,6 +12,9 @@ from gradio_ui import get_gradio_ui
 from learning import learn_model
 from inference import use_model
 
+from miditok import REMI, TokenizerConfig
+from symusic import Score
+
 # import os
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
@@ -138,12 +141,28 @@ def main():
         USE_MODEL = music_model
         USE_DATASET = dataset
 
-        gradio = get_gradio_ui(gradio_use)
+        gradio = get_gradio_ui(gradio_use, gradio_imitation_use)
         gradio.launch(share=False)
 
 def gradio_use(prompt: str, temperature: float, top_k: int, output_count: int):
-    print("Генераци через Gradio")
+    print("Обычная генераци через Gradio")
     return use_model(USE_MODEL, USE_DATASET, prompt, temperature, top_k, output_count, SOUND_FONT_PATH)
+
+def gradio_imitation_use(prompt: str, temperature: float, midi_path: str, top_k: int, output_count: int):
+    print("Подражение через Gradio")
+
+    config = TokenizerConfig(num_velocities=16, use_chords=True, use_programs=True)
+    worker_tokenizer = REMI(config)
+
+    midi = Score(midi_path)
+    tokens = worker_tokenizer(midi)
+
+    if not hasattr(tokens, 'ids'):
+        return None
+    ids = tokens.ids
+    ids = torch.tensor(ids)
+
+    return use_model(USE_MODEL, USE_DATASET, prompt, temperature, top_k, output_count, SOUND_FONT_PATH, backloop_song_vibe=ids)
 
 if __name__ == "__main__":
     print("\nWORKER INITIALIZED")
