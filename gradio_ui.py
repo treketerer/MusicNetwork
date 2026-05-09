@@ -74,7 +74,7 @@ def get_gradio_ui(inference_function, inference_imitation_function):
                     output_audio = gr.Audio(label="MP3")
             generate_button.click(
                 fn=inference_imitation_function,
-                inputs=[input_prompt, input_temp, midi_input, input_top_k, input_tokens],
+                inputs=[input_prompt, midi_input, input_temp, input_top_k, input_tokens],
                 outputs=[out_text, midi_out, output_audio]
             )
         with gr.Tab(label="Алфавит"):

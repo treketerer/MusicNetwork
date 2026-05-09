@@ -10,6 +10,12 @@ midi/
 .idea/*
 __pycache__/*
 */__pycache__/*
+**/__pycache__/
+*.pyс
+*$py.class
+.idea/
+.vscode/
+.gradio/
 test.py
 *.zip
 *.csv

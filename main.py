@@ -6,14 +6,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+import data_utils
+import inference
 from core.music_nn import MusicNN
 from data_utils.dataset import MusicStreamingDataset
 from gradio_ui import get_gradio_ui
 from learning import learn_model
-from inference import use_model
-
-from miditok import REMI, TokenizerConfig
-from symusic import Score
 
 # import os
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
@@ -47,17 +45,16 @@ model_output_path = paths.get("local_models")
 
 NEED_TO_LEARN = False
 LOAD_LEARNED_MODEL = True
-SAVED_MODEL_PATH = f"{model_input_path}/372989_music_model_1_final.pth"
+SAVED_MODEL_PATH = f"{model_input_path}/MusicNN_v1.9.pth"
 
 SOUND_FONT_PATH = "./data/soundfonts/SGM-V2.01.sf2"
 
 # LOGIC START
 
-USE_MODEL = None
-USE_DATASET = None
+Inference_Manager: inference.Inference_Manager | None = None
 
 def main():
-    global USE_MODEL, USE_DATASET
+    global Inference_Manager
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Работа будет идти на {device}")
@@ -138,31 +135,17 @@ def main():
         finish = datetime.datetime.now()
         print('Обучение завершено!\nВремя работы: ' + str(finish - start))
     else:
-        USE_MODEL = music_model
-        USE_DATASET = dataset
-
+        Inference_Manager = inference.Inference_Manager(music_model, dataset, max_token_in_tact, max_instruments, SOUND_FONT_PATH)
         gradio = get_gradio_ui(gradio_use, gradio_imitation_use)
         gradio.launch(share=False)
 
 def gradio_use(prompt: str, temperature: float, top_k: int, output_count: int):
-    print("Обычная генераци через Gradio")
-    return use_model(USE_MODEL, USE_DATASET, prompt, temperature, top_k, output_count, SOUND_FONT_PATH)
+    print("Gradio Обычная генераци")
+    return Inference_Manager.common_generation_prepare(prompt, temperature, top_k, output_count)
 
-def gradio_imitation_use(prompt: str, temperature: float, midi_path: str, top_k: int, output_count: int):
-    print("Подражение через Gradio")
-
-    config = TokenizerConfig(num_velocities=16, use_chords=True, use_programs=True)
-    worker_tokenizer = REMI(config)
-
-    midi = Score(midi_path)
-    tokens = worker_tokenizer(midi)
-
-    if not hasattr(tokens, 'ids'):
-        return None
-    ids = tokens.ids
-    ids = torch.tensor(ids)
-
-    return use_model(USE_MODEL, USE_DATASET, prompt, temperature, top_k, output_count, SOUND_FONT_PATH, backloop_song_vibe=ids)
+def gradio_imitation_use(prompt: str, midi_input: str, temperature: float, top_k: int, output_count: int):
+    print("Gradio Генерация подражения")
+    return Inference_Manager.imitation_generation_prepare(prompt, midi_input, temperature, top_k, output_count)
 
 if __name__ == "__main__":
     print("\nWORKER INITIALIZED")

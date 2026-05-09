@@ -188,7 +188,7 @@ class MusicNN(nn.Module):
 
         emb = self.instruments_lstm.midi_embeddings(torch.tensor(current_tact_data, device=device)).to(device)
         sum_notes = emb.unsqueeze(0).unsqueeze(0)
-        backloop_vector = self.backloop_encoder(sum_notes, tacts_instr)
+        backloop_vector = self.backloop_encoder(sum_notes)
 
         return final_tact_data, backloop_vector, cond_h, cond_c
 

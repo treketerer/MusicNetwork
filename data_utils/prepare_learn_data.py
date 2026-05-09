@@ -87,9 +87,8 @@ class MidiParser:
         worker_tokenizer = REMI(config)
         worker_zips = {}
 
-    def parse_tokens_in_ids_arr(self, ids, start_programs_token: int) -> tuple[
+    def parse_tokens_in_ids_arr(self, ids, start_programs_token: int, worker_tokenizer) -> tuple[
         list[dict[str, list]], list]:
-        global worker_tokenizer
 
         # 1. Находим токен нулевой позиции
         pos_0_token = None
@@ -175,7 +174,7 @@ class MidiParser:
             if not ids:
                 return {"error": "EMPTY_TOKENS", "md5": md5}
 
-            tacts, instruments_list = self.parse_tokens_in_ids_arr(ids, start_programs_token, now_instrument_id)
+            tacts, instruments_list = self.parse_tokens_in_ids_arr(ids, start_programs_token, worker_tokenizer)
 
             json_line = {
                 'file_path': path,
