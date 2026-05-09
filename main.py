@@ -6,24 +6,28 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+import data_utils
+import inference
 from core.music_nn import MusicNN
 from data_utils.dataset import MusicStreamingDataset
 from gradio_ui import get_gradio_ui
 from learning import learn_model
-from inference import use_model
+
+# import os
+# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 # CONFIGS
 BATCH_SIZE = 4
-LEARNING_RATE = 0.0003
-EPOCHS_COUNT = 2
-BUFFER_SIZE = 1024
+LEARNING_RATE = 0.00008
+EPOCHS_COUNT = 1
+BUFFER_SIZE = 8192
 PRINT_COEF = 1
 ACCUMULATION_STEPS = 16
-SCHEDULER_PATIENCE = 150
+SCHEDULER_PATIENCE = 3
 
-max_tacts = 15
-max_token_in_tact = 100
-max_instruments = 10
+max_tacts = 16
+max_token_in_tact = 125
+max_instruments = 13
 
 paths = {
     "collab": "/content/data",
@@ -41,17 +45,16 @@ model_output_path = paths.get("local_models")
 
 NEED_TO_LEARN = False
 LOAD_LEARNED_MODEL = True
-SAVED_MODEL_PATH = f"{model_input_path}/135089_music_model_6_final.pth"
+SAVED_MODEL_PATH = f"{model_input_path}/MusicNN_v1.9.pth"
 
 SOUND_FONT_PATH = "./data/soundfonts/SGM-V2.01.sf2"
 
 # LOGIC START
 
-USE_MODEL = None
-USE_DATASET = None
+Inference_Manager: inference.Inference_Manager | None = None
 
 def main():
-    global USE_MODEL, USE_DATASET
+    global Inference_Manager
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Работа будет идти на {device}")
@@ -75,8 +78,8 @@ def main():
     music_model = MusicNN(
         dataset.get_words_alphabet_len(),
         dataset.get_midi_alphabet_len(),
-        129, 512,
-    256, 256, 512)
+        129, 768,
+    256, 128, 128)
 
     print("Модель инициализирована!")
 
@@ -132,15 +135,17 @@ def main():
         finish = datetime.datetime.now()
         print('Обучение завершено!\nВремя работы: ' + str(finish - start))
     else:
-        USE_MODEL = music_model
-        USE_DATASET = dataset
-
-        gradio = get_gradio_ui(gradio_use)
+        Inference_Manager = inference.Inference_Manager(music_model, dataset, max_token_in_tact, max_instruments, SOUND_FONT_PATH)
+        gradio = get_gradio_ui(gradio_use, gradio_imitation_use)
         gradio.launch(share=False)
 
-def gradio_use(prompt: str, temperature: float, top_k: int, duration: float, output_count: int):
-    print("Генераци через Gradio")
-    return use_model(USE_MODEL, USE_DATASET, prompt, temperature, top_k, duration, output_count, SOUND_FONT_PATH)
+def gradio_use(prompt: str, temperature: float, top_k: int, output_count: int):
+    print("Gradio Обычная генераци")
+    return Inference_Manager.common_generation_prepare(prompt, temperature, top_k, output_count)
+
+def gradio_imitation_use(prompt: str, midi_input: str, temperature: float, top_k: int, output_count: int):
+    print("Gradio Генерация подражения")
+    return Inference_Manager.imitation_generation_prepare(prompt, midi_input, temperature, top_k, output_count)
 
 if __name__ == "__main__":
     print("\nWORKER INITIALIZED")

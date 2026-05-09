@@ -10,7 +10,7 @@ from data.keywords import ban_list, all_translations, all_instruments
 
 class MusicStreamingDataset(IterableDataset):
     def __init__(self, parsed_midi_path, words_alphabet_path, midi_alphabet_path,
-                 buffer_size=100, max_tacts=20, max_token_in_tact=64, max_instruments=5):
+                 buffer_size=256, max_tacts=20, max_token_in_tact=150, max_instruments=15):
 
         self.max_instruments = max_instruments
         self.max_tacts = max_tacts
@@ -195,7 +195,7 @@ class MusicStreamingDataset(IterableDataset):
 
     def parse_data_tensors(self, data):
         res = data.copy()
-        res['idx_prompt'] = torch.tensor(res['idx_prompt'], dtype=torch.long)
+        res['idx_prompt'] = torch.tensor(res['prompt'], dtype=torch.long)
         res['instruments'] = torch.tensor(res['instruments'], dtype=torch.long)
 
         tacts = res.get('tacts')
@@ -204,6 +204,7 @@ class MusicStreamingDataset(IterableDataset):
         if tacts_len > self.max_tacts:
             rand_start = random.randint(0, tacts_len - self.max_tacts)
             tacts = tacts[rand_start : rand_start+self.max_tacts]
+            # tacts = tacts[:self.max_tacts]
 
         tacts_len = len(tacts)
 
