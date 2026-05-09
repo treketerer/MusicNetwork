@@ -29,10 +29,11 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
     epoch = 0
     current_loss = None
 
-    criterion_notes = nn.CrossEntropyLoss(ignore_index=0)
+    criterion_notes = nn.CrossEntropyLoss(ignore_index=0) #, label_smoothing=0.07)
     criterion_insts = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(10.0).to(DEVICE))
 
     try:
+        global_loss_history = []
         for epoch in range(epochs_count):
             train_loader = DataLoader(
                 dataset,
@@ -44,18 +45,30 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                 pin_memory=True  # <--- Ускоряет передачу данных
             )
 
-            loop = tqdm(train_loader, leave=False)
+            loop = tqdm(train_loader, leave=False, mininterval=10.0)
             loop.set_description(f"Epoch {epoch}")
-            loss_history = []
 
+            local_loss_history = []
+
+            save_coef = max(1, int(len(loop) / 3.7))
             for i, batch in enumerate(loop):
                 prompts = batch.get('idx_prompts').to(DEVICE, non_blocking=True)
                 full_instruments = batch.get('instruments').to(DEVICE, non_blocking=True)
                 tacts_data = batch.get('tacts_data').to(DEVICE, non_blocking=True)
                 tacts_instruments = batch.get('tacts_instruments').to(DEVICE, non_blocking=True)
 
-                inp_tdata = tacts_data.to(DEVICE)
+                inp_tdata = tacts_data.clone().to(DEVICE)
                 target_tdata = tacts_data.to(DEVICE)
+
+                # снижение teaching forsing
+                noise_probe = 0.10
+                noise_mask = torch.rand(inp_tdata.shape, device=DEVICE) < noise_probe
+                system_tokens_mask = (inp_tdata == 0) | (inp_tdata == 1) | (inp_tdata == 2) | (inp_tdata == 4)
+                noise_mask = noise_mask & (~system_tokens_mask)
+                random_tokens = torch.randint(5, dataset.midi_alphabet_len, inp_tdata.shape, device=DEVICE)
+
+                inp_tdata[noise_mask] = random_tokens[noise_mask]
+
                 inp_inst = tacts_instruments.to(DEVICE)
                 target_inst = tacts_instruments.to(DEVICE)
 
@@ -81,41 +94,56 @@ def learn_model(model: MusicNN, dataset: MusicStreamingDataset, optimizer, sched
                     target_real.reshape(-1, 129).float()
                 )
 
-                current_loss = loss_notes * 1.5 + loss_inst * 1.0
+                current_loss = loss_notes * 1.4 + loss_inst * 1.0
                 loss_normalized = current_loss / accumulation_steps
                 loss_normalized.backward()
 
                 if (i + 1) % accumulation_steps == 0:
-                    nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                    nn.utils.clip_grad_norm_(model.parameters(), max_norm=3.0)
                     optimizer.step()
                     optimizer.zero_grad()
 
                     current_lr = optimizer.param_groups[0]['lr']
 
                     loop.set_postfix(loss=current_loss.item(), loss_inst=loss_inst.item(), loss_notes=loss_notes.item(), lr=current_lr)
-                    loss_history.append(current_loss.item())
+                    local_loss_history.append(current_loss.item())
 
-                    scheduler.step(current_loss.item())
-
-                if i % 3500 == 0 and i > 0:
+                if i % save_coef == 0 and i > 0:
                     save_model(model_output_path, save_model_id, f"{epoch}_{i}", model, optimizer, current_loss)
+
+                    avg_epoch_loss = sum(local_loss_history) / len(local_loss_history)
+                    scheduler.step(avg_epoch_loss)
+                    global_loss_history += [*local_loss_history]
+                    local_loss_history = []
+                    print(f"Средний лосс за срез: {avg_epoch_loss:.4f}")
 
             print(f"Эпоха {epoch} завершена!")
             try:
+                global_loss_history += local_loss_history
+
+                avg_epoch_loss = sum(local_loss_history) / len(local_loss_history)
+                scheduler.step(avg_epoch_loss)
+                print(f"Средний лосс за срез: {avg_epoch_loss:.4f}")
+
                 save_model(model_output_path, save_model_id, f"{epoch}_final", model, optimizer, current_loss)
-                plt.clf()
-                plt.plot(loss_history)
-                plt.title(f"Loss Epoch {epoch} {save_model_id}")
-                plt.savefig(f"{model_output_path}/{save_model_id}_loss_epoch_{epoch}.png")  # Сохраняем картинку
-                plt.close()
+                save_loss_image(local_loss_history, epoch, model_output_path, save_model_id)
             except Exception as ex:
                 save_model(model_output_path, save_model_id, f"{epoch}", model, optimizer, current_loss)
 
+        save_loss_image(global_loss_history, epoch, model_output_path, save_model_id)
+        # save_model(model_output_path, save_model_id, f"{epoch}", model, optimizer, current_loss)
 
     except Exception as e:
         print(f"\nОшибка во время обучения: {e}")
         if current_loss is not None:
             save_model(model_output_path, save_model_id, epoch, model, optimizer, current_loss)
+
+def save_loss_image(loss_history: list, epoch_description: str | int, model_output_path: str, save_model_id: int):
+    plt.clf()
+    plt.plot(loss_history)
+    plt.title(f"Loss Epoch {epoch_description} {save_model_id}")
+    plt.savefig(f"{model_output_path}/{save_model_id}_loss_epoch_{epoch_description}.png")  # Сохраняем картинку
+    plt.close()
 
 def save_model(model_output_path, save_model_id, epoch, model, optimizer, current_loss):
     path = f"{model_output_path}/{save_model_id}_music_model_{epoch}.pth"

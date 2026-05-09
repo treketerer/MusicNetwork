@@ -1,9 +1,10 @@
 import json
 import random
 import os
+import re
+from collections import Counter
 
 from data.keywords import all_translations
-from metaparser import get_captions_tags
 from multiprocessing import cpu_count
 import concurrent
 
@@ -12,6 +13,9 @@ from symusic import Score
 import logging
 import sys
 
+import csv
+
+from urllib.parse import unquote
 
 # Сначала отключаем логирование, ДО любых импортов библиотек обработки
 # os.environ['SYMUSIC_LOG_LEVEL'] = '0' # Иногда 0, parfois OFF, depends on version
@@ -22,238 +26,387 @@ logging.getLogger("miditok").setLevel(logging.ERROR)
 
 # --- Глобальная переменная для воркера ---
 worker_tokenizer = None
+worker_zips = {}
 
-def init_worker():
-    global worker_tokenizer
+class MidiParser:
+    def parse_midi_tokens(self, parsed_midi_meta: list[tuple]):
+        print(len(parsed_midi_meta))
 
-    # --- БЛОК ПОДАВЛЕНИЯ ВЫВОДА ---
-    # Открываем "null" устройство (в никуда)
-    devnull = open(os.devnull, 'w')
+        to_process: list[tuple] = []
 
-    # Перенаправляем stdout и stderr текущего процесса в null
-    # Мы сохраняем оригинальные дескрипторы, если вдруг понадобятся (но в worker'е они не нужны)
-    try:
-        os.dup2(devnull.fileno(), sys.stdout.fileno())
-        os.dup2(devnull.fileno(), sys.stderr.fileno())
-    except Exception:
-        pass
+        processed_midi = set()
 
-    """Инициализация токенизатора один раз для каждого процесса"""
-    # Создаем конфиг внутри процесса
-    config = TokenizerConfig(num_velocities=16, use_chords=True, use_programs=True)
-    worker_tokenizer = REMI(config)
+        if os.path.exists("../data/parsed_midi.jsonl"):
+            with open("../data/parsed_midi.jsonl", "r", encoding="utf-8") as f:
+                for line in f:
+                    line_data = json.loads(line)
+                    md5 = line_data.get('md5')
+                    if md5 is not None:
+                        processed_midi.add(md5)
 
-def get_midi_prompt(prompts_tags):
-    midi_prompt = {}
-    # with open('../data/midi_prompt_meta_keys.jsonl', 'r', encoding='utf-8') as f:
-    print(len(prompts_tags))
-    for i, items in enumerate(prompts_tags):
-        track = items.get('md5')
-        keys = items.get('prompt_keys')
-        prompt_keys = keys.replace("_"," ").split()
-        instruments_arr = json.loads(keys[keys.index("inst:")+5:])
-        random.shuffle(prompt_keys)
+        for track in parsed_midi_meta:
+            md5 = track[0]
+            if md5 not in processed_midi:
+                to_process.append(track)
 
-        exit_prompt = []
+        total_files = len(to_process)
+        print(f"К обработке: {len(to_process)} файлов")
 
-        for key in prompt_keys:
-            prompt_form = ""
-            if key in all_translations:
-                prompt_form = random.choice(all_translations[key])
-            exit_prompt.append(prompt_form)
-        midi_prompt[track] = (track, ' '.join(exit_prompt).lower(), instruments_arr)
+        workers = max(1, cpu_count() - 1)
 
-        if i % 1000000 == 0:
-            print(f"{i}/{len(prompts_tags)}")
+        with open("../data/parsed_midi.jsonl", "a", encoding="utf-8") as f:
+            with concurrent.futures.ProcessPoolExecutor(max_workers=workers, initializer=self.init_worker) as executor:
+                results_iterator = executor.map(self.process_single_midi, to_process, chunksize=12)
 
-    return midi_prompt
+                for i, result in enumerate(results_iterator):
+                    if result:
+                        f.write(json.dumps(result, ensure_ascii=False) + "\n")
 
-def init_alphabets():
-    alphabet_words = set()
+                    if i % 1000 == 0:
+                        print(f"Готово: {i}/{total_files} ({(i / total_files) * 100:.2f}%)")
+                        f.flush()
 
-    for key, values in all_translations.items():
-        alphabet_words.add(key.lower())
-        value_words = " ".join(values).split()
-        for word in value_words:
-            alphabet_words.add(word.lower())
-    alphabet_words.add("<unk>")
+    def init_worker(self):
+        global worker_tokenizer
 
-    alph_list = list(alphabet_words)
-    alph_list.sort()
+        # --- БЛОК ПОДАВЛЕНИЯ ВЫВОДА ---
+        # Открываем "null" устройство (в никуда)
+        devnull = open(os.devnull, 'w')
 
-    alph_dict = dict(enumerate(alph_list))
-    reverse_alph_dict = {v: k for k, v in alph_dict.items()}
+        # Перенаправляем stdout и stderr текущего процесса в null
+        # Мы сохраняем оригинальные дескрипторы, если вдруг понадобятся (но в worker'е они не нужны)
+        try:
+            os.dup2(devnull.fileno(), sys.stdout.fileno())
+            os.dup2(devnull.fileno(), sys.stderr.fileno())
+        except Exception:
+            pass
 
-    with open("../data/words_alphabet.jsonl", "w", encoding="utf-8") as f:
-        f.write(json.dumps(alph_dict, ensure_ascii=False) + "\n")
-        f.write(json.dumps(reverse_alph_dict, ensure_ascii=False) + "\n")
+        """Инициализация токенизатора один раз для каждого процесса"""
+        # Создаем конфиг внутри процесса
+        config = TokenizerConfig(num_velocities=16, use_chords=True, use_programs=True)
+        worker_tokenizer = REMI(config)
+        worker_zips = {}
 
-    config = TokenizerConfig(num_velocities=16, use_chords=True, use_programs=True)
-    tokenizer = REMI(config)
-    vocab = tokenizer.vocab
-    revers_vocab = dict(zip(vocab.values(), vocab.keys()))
+    def parse_tokens_in_ids_arr(self, ids, start_programs_token: int, worker_tokenizer) -> tuple[
+        list[dict[str, list]], list]:
 
-    with open("../data/midi_alphabet.jsonl", "w", encoding="utf-8") as f:
-        f.write(json.dumps(vocab, ensure_ascii=False) + "\n")
-        f.write(json.dumps(revers_vocab, ensure_ascii=False) + "\n")
+        # 1. Находим токен нулевой позиции
+        pos_0_token = None
+        for k, v in worker_tokenizer.vocab.items():
+            if k == "Position_0/4" or k == "Position_0":
+                pos_0_token = v
+                break
 
-    return alph_list
+        is_pos_token = {v: k.startswith("Position") for k, v in worker_tokenizer.vocab.items()}
 
-def process_single_midi(data: list):
-    md5, _, prompt_idx, instruments_arr = data
-    global worker_tokenizer
-    start_programs_token = 282
-    tacts = []
-    tact = {'prepare': []}
-    now_instrument_id = -2
+        tacts = []
+        tact = {}
+        instruments = set()
 
-    try:
-        path = f"../midi/{md5}.mid"
-        if not os.path.exists(path):
-            return None
-
-        midi = Score(path)
-        tokens = worker_tokenizer(midi)
-        ids = []
-        if hasattr(tokens, 'ids'):
-            ids = tokens.ids
-        elif isinstance(tokens, list):
-            ids = tokens  # Если это уже список
-        elif isinstance(tokens, dict) and 'ids' in tokens:
-            ids = tokens['ids']
-        else:
-            return {"error": f"UNKNOWN_TOKEN_FORMAT: {type(tokens)}", "md5": md5}
-
-        if not ids:
-            return {"error": "EMPTY_TOKENS", "md5": md5}
-
-        print(ids)
+        # Инициализируем нулевой позицией
+        current_position = pos_0_token
+        now_instrument_id = -1
 
         for token in ids:
-            # Когда новый такт
-            if token == 4 and len(tact) > 1:
-                for instrument in tact:
-                    tact[instrument].append(2)
-                    tact[instrument].insert(0, 1)
-
-                del tact['prepare']
-                tacts.append(tact.copy())
-
-                del tact
+            if token == 4:
+                if tact:
+                    for inst in tact:
+                        tact[inst].append(2)
+                        tact[inst].insert(0, 1)
+                    tacts.append(tact.copy())
+                    instruments.update(tact.keys())
                 tact = {}
-                tact['prepare'] = []
-                now_instrument_id = -2
+                current_position = pos_0_token  # СБРОС В 0 ПРИ НОВОМ ТАКТЕ
+                now_instrument_id = -1
+                continue
+
+            if is_pos_token.get(token, False):
+                current_position = token
+                continue
+
             if token >= start_programs_token:
                 now_instrument_id = token - start_programs_token
-                print(now_instrument_id)
-
                 if now_instrument_id not in tact:
-                    tact[now_instrument_id] = (tact['prepare']).copy()
+                    tact[now_instrument_id] = []
 
-            print(token, start_programs_token, token >= start_programs_token)
-            if token >= start_programs_token:
+                # Теперь даже самая первая нота в такте получит токен времени 0
+                if current_position is not None:
+                    if not tact[now_instrument_id] or tact[now_instrument_id][-1] != current_position:
+                        tact[now_instrument_id].append(current_position)
                 continue
-            if now_instrument_id != -2:
+
+            if now_instrument_id != -1 and now_instrument_id in tact:
                 tact[now_instrument_id].append(token)
-            elif token != 4:
-                tact['prepare'].append(token)
 
-        if len(tact) > 1:
-            if 'prepare' in tact: del tact['prepare']  # если нужно
+        # Сохраняем последний такт (если midi оборвалось без токена 4)
+        if tact:
+            for inst in tact:
+                tact[inst].append(2)
+                tact[inst].insert(0, 1)
             tacts.append(tact.copy())
+            instruments.update(tact.keys())
 
-        json_line = {"md5": md5, "tokens": tacts}
-        return json_line
-    except Exception as e:
-        print(e)
-        return {"error": f"UNHANDLED_EXCEPTION: {e} {tact} {tacts}", "md5": md5}
+        return tacts, list(instruments)
 
-def parse_midi_tokens(md5_paths, midi_prompts):
-    parsed_files = set()
-    if os.path.exists("../data/parsed_midi.jsonl"):
-        with open("../data/parsed_midi.jsonl", "r", encoding="utf-8") as f:
-            for line in f:
-                data = json.loads(line)
-                parsed_files.add(data.get('md5'))
-            f.close()
+    def process_single_midi(self, track_data: dict):
+        md5, path, indexes, prompt, tags = track_data
+        global worker_tokenizer
 
-    base_path = "C:/Project/MusicNetwork/midi/"
-    to_process = []
+        start_programs_token = 282
+        now_instrument_id = -2
 
-    for md5 in md5_paths:
-        if md5 not in parsed_files and os.path.exists(f"{base_path}{md5}.mid"):
-            to_process.append((md5, *midi_prompts[md5]))
+        try:
+            if not os.path.exists(path):
+                return {"error": f"PATH NOT FOUND: {path}", "md5": md5}
 
-    total_files = len(to_process)
-    print(f"К обработке: {len(to_process)} файлов")
+            midi = Score(path)
+            tokens = worker_tokenizer(midi)
+            ids = []
+            if hasattr(tokens, 'ids'):
+                ids = tokens.ids
+            elif isinstance(tokens, list):
+                ids = tokens  # Если это уже список
+            elif isinstance(tokens, dict) and 'ids' in tokens:
+                ids = tokens['ids']
+            else:
+                return {"error": f"UNKNOWN_TOKEN_FORMAT: {type(tokens)}", "md5": md5}
 
-    workers = max(1, cpu_count() - 1)
+            if not ids:
+                return {"error": "EMPTY_TOKENS", "md5": md5}
 
-    with open("../data/parsed_midi.jsonl", "a", encoding="utf-8") as f:
-        with concurrent.futures.ProcessPoolExecutor(max_workers=workers, initializer=init_worker) as executor:
-            results_iterator = executor.map(process_single_midi, to_process, chunksize=10)
+            tacts, instruments_list = self.parse_tokens_in_ids_arr(ids, start_programs_token, worker_tokenizer)
 
-            for i, result in enumerate(results_iterator):
-                if result:
-                    f.write(json.dumps(result) + "\n")
+            json_line = {
+                'file_path': path,
+                "md5": md5,
+                'prompt': indexes,
+                'instruments': instruments_list,
+                'prompt_words': prompt,
+                'prompt_tags': tags,
+                'tacts': tacts
+            }
+            return json_line
 
-                if i % 1000 == 0:
-                    print(f"Готово: {i}/{total_files} ({(i / total_files) * 100:.2f}%)")
-                    f.flush()
+        except Exception as e:
+            return {"error": f"ERROR: {str(e)}", "md5": md5}
+
+
+class CsvParser:
+    def __init__(self):
+        self.artists_ban_list = {'Trad'}
+
+        maxInt = sys.maxsize
+        while True:
+            try:
+                csv.field_size_limit(maxInt)
+                break
+            except OverflowError:
+                maxInt = int(maxInt / 10)
+
+        self.styles_counter = Counter()
+        self.artists_counter = Counter()
+
+        self.tempo_re = re.compile(r'qpm=([\d.]+)')
+
+        self.sorted_translation = sorted(list(all_translations.keys()), key=len, reverse=True)
+
+
+    def parse_csv(self):
+        prompt_words_indexes = self.init_alphabets()
+
+        all_rows_list: list[tuple] = []
+        counter = 0
+        for i, row in enumerate(self.read_file('../data/meta/GigaMIDI-Dataset.csv')):
+            if self.is_raw_valid(row):
+                tags = self.get_music_tokens(row)
+                prompt, indexes = self.get_midi_prompt(tags, prompt_words_indexes)
+
+                split_path = str(row['file_path']).split('/')
+
+                data_category = split_path[2].split('-')[0]
+                drums_category = split_path[3]
+
+                path = f"../data/{split_path[1]}/{data_category}-{drums_category}/{'/'.join(split_path[4:])}"
+
+                md5 = str(row['md5'])
+
+                # type = int(row['instrument_category: drums-only: 0, all-instruments-with-drums: 1,no-drums: 2'])
+                # if type > 0:
+                #     instruments = str(row['NOMML'])
+                # else:
+                #     instruments = '[128]'
+
+                all_rows_list.append(
+                    ( md5, path, indexes, prompt, tags )
+                )
+
+                counter += 1
+                if counter % 50000 == 0:
+                    print(f"{counter} ({i})", prompt, indexes, tags, path, '', sep="\n")
+
+        return all_rows_list
+
+    def is_raw_valid(self, row: dict):
+        if (len(row['music_style_scraped']) == 0 or
+                len(row['title']) == 0 or
+                int(row['num_tracks']) == 0 or
+                int(row['total_notes']) < 100):
+            return False
+        return True
+
+    def get_music_tokens(self, row):
+        music_style_raw = unquote(str(row['music_style_scraped']))
+        music_styles_tags = music_style_raw.split(',')
+        self.styles_counter.update(music_styles_tags)
+
+        artist = str(row['artist'])
+        artist = ( artist
+                  .replace('\n', ' ')
+                  .replace(",", "")
+                  .replace(".", "")
+                  .replace(" ", "-")
+                  .replace("'", "") )
+        # artist = artist.encode('ascii', 'ignore').decode('ascii')  # удалит ударения (á -> a) и BOM
+
+        self.artists_counter.update([artist])
+
+        avg_velocity = float(row['avg_velocity']) # 68.2734375
+        drums_type = str(row['Type']) # no-drums drums-only all-instruments-with-drums
+
+        tempo_info = str(row['tempo']) #Tempo(time=0, qpm=118.99992463338107, mspq=504202, ttype='Tick')
+        tempo_search = self.tempo_re.search(tempo_info)
+        tempo = tempo_search.group(0).split("=")[1] if tempo_search is not None else -1
+        tempo_val = float(tempo)
+
+        avg_note_duration = float(row['avg_note_duration'])  # 308.4344005021971
+
+        # velocity
+        if avg_velocity < 40:
+            velocity_tag = "very-quiet"
+        elif avg_velocity < 60:
+            velocity_tag = "quiet"
+        elif avg_velocity < 85:
+            velocity_tag = "moderate-loudness"
+        elif avg_velocity < 105:
+            velocity_tag = "loud"
+        else:
+            velocity_tag = "very-loud"
+
+        # tempo
+        if tempo_val < 65:
+            tempo_tag = "very-slow-tempo"
+        elif tempo_val < 90:
+            tempo_tag = "slow-tempo"
+        elif tempo_val < 125:
+            tempo_tag = "moderate-tempo"
+        elif tempo_val < 160:
+            tempo_tag = "fast-tempo"
+        else:
+            tempo_tag = "very-fast-tempo"
+
+        if avg_note_duration < 150:
+            note_durations_tag = "staccato-style"
+        elif avg_note_duration < 350:
+            note_durations_tag = "short-notes"
+        elif avg_note_duration < 600:
+            note_durations_tag = "medium-length-notes"
+        else:
+            note_durations_tag = "long-legato-notes"
+
+        prompt_tags = [
+            velocity_tag,
+            tempo_tag,
+            note_durations_tag,
+            drums_type,
+            *music_styles_tags
+        ]
+        if artist not in self.artists_ban_list:
+            prompt_tags.append(artist)
+
+        filtered_tags = [item for item in prompt_tags if random.randint(0, 10) > 2]
+
+        if len(filtered_tags) < 2:
+            filtered_tags = prompt_tags
+
+        return filtered_tags
+
+    def get_midi_prompt(self, prompt_tags: list, prompt_words_indexes: dict[str, int]) -> tuple[str, list[str]]:
+        random.shuffle(prompt_tags)
+        exit_prompt = []
+        for i, tag in enumerate(prompt_tags):
+            clean_tag = tag.replace("-", " ").lower()
+
+            if clean_tag in self.sorted_translation:
+                exit_prompt.append(random.choice(all_translations[clean_tag]))
+            else:
+                parts = clean_tag.split()
+                for part in parts:
+                    if part in self.sorted_translation:
+                        exit_prompt.append( random.choice(all_translations[part]) )
+
+        prompt = " ".join(exit_prompt)
+
+        indexes_prompt = []
+        for word in prompt.split():
+            if word in prompt_words_indexes:
+                indexes_prompt.append(prompt_words_indexes[word])
+        return prompt, indexes_prompt
+
+    def init_alphabets(self) -> dict[str, int]:
+        words_jsonl = "../data/words_alphabet.jsonl"
+        midi_jsonl = "../data/midi_alphabet.jsonl"
+
+        if os.path.exists(words_jsonl) and os.path.exists(midi_jsonl):
+            with open(words_jsonl, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                if len(lines) >= 2:
+                    return json.loads(lines[1])
+            print("ФАЙЛ АЛФАВИТА ПУСТ!!!")
+
+        alphabet_words = set()
+
+        for key, values in all_translations.items():
+            alphabet_words.add(key.lower())
+            value_words = " ".join(values).split()
+            for word in value_words:
+                alphabet_words.add(word.lower())
+        alphabet_words.add("<unk>")
+
+        alph_list = list(alphabet_words)
+        alph_list.sort()
+
+        alph_dict = dict(enumerate(alph_list))
+        reverse_alph_dict = {v: k for k, v in alph_dict.items()}
+
+        with open(words_jsonl, "w", encoding="utf-8") as f:
+            f.write(json.dumps(alph_dict, ensure_ascii=False) + "\n")
+            f.write(json.dumps(reverse_alph_dict, ensure_ascii=False) + "\n")
+
+        config = TokenizerConfig(num_velocities=16, use_chords=True, use_programs=True)
+        tokenizer = REMI(config)
+        vocab = tokenizer.vocab
+        revers_vocab = dict(zip(vocab.values(), vocab.keys()))
+
+        with open(midi_jsonl, "w", encoding="utf-8") as f:
+            f.write(json.dumps(vocab, ensure_ascii=False) + "\n")
+            f.write(json.dumps(revers_vocab, ensure_ascii=False) + "\n")
+
+        return reverse_alph_dict
+
+    # '../data/meta/GigaMIDI-Dataset.csv'
+    def read_file(self, path):
+        with open(path, newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile, delimiter=',', quotechar='"')
+            for row in reader:
+                yield row
 
 def main():
     print("ЗАПУЩЕН ПРОЦЕСС ПРЕДПОДГОТОВКИ ДАННЫХ")
-    all_md5, prompts_tags = get_captions_tags()
-
-    all_md5 = set()
-    prompts_tags = []
-    with open("../data/prompt_tags.jsonl", "r", encoding="utf-8") as f:
-        for i, line in enumerate(f):
-            data = json.loads(line)
-            all_md5.add(data.get('md5'))
-            # prompts_tags.append(data)
-            if i >= 70000:
-                break
-
-    print("MIDI ПРОМПТ ТЕГИ ИНИЦИАЛИЗИРОВАНЫ!")
-
-    init_alphabets()
-    print("АЛФАВИТЫ СЛОВ и MIDI ТЭГОВ ИНИЦИАЛИЗИРОВАНЫ!")
-
-    print("\nЗапущен процесс составления промптов!")
-    midi_prompts = get_midi_prompt(prompts_tags)
-    del prompts_tags
-    print("ПРОМПТЫ СОСТАВЛЕНЫ!")
-    # save_prompts(midi_prompts)
-    # print("ПРОМПТЫ СОХРАНЕНЫ В ФАЙЛ!")
-
-    all_md5_list = list(all_md5)[:70000]
-    del all_md5
-    print("Запуск токенизации MIDI файлов!")
-    parse_midi_tokens(all_md5, midi_prompts)
-    print("MIDI ФАЙЛЫ ТОКЕНИЗИРОВАННЫ!")
-
+    print("\nПарсинг метаданных из CSV файла")
+    metadata = CsvParser().parse_csv()
+    print("\nПарсинг токенов из midi файлов")
+    MidiParser().parse_midi_tokens(metadata)
+    print("Парсинг данных завершен")
 
 if __name__ == "__main__":
     main()
-
-
-
-# buffer = []
-    # with open("../data/parsed_midi.jsonl", "r", encoding="utf-8") as f_read:
-    #     for i, line in enumerate(f_read):
-    #         parsed = json.loads(line)
-    #         md5 = parsed['md5']
-    #         tacts = parsed.get('tokens')
-    #         if tacts is not None:
-    #             for tact in tacts:
-    #                 for instrument in tact:
-    #                     tact[instrument].append(2)
-    #             buffer.append(json.dumps({'md5': md5, 'tacts': tacts}))
-    #             if i % 1000 == 0:
-    #                 print(i)
-    #         else:
-    #             print(parsed)
-    #
-    # with open("../data/parsed_midi.jsonl", "w", encoding="utf-8") as f_write:
-    #     f_write.write("\n".join(buffer))

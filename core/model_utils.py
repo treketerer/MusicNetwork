@@ -10,7 +10,7 @@ class SongInstrumentsLinearParser(nn.Module):
         self.input_dim = input_dim
         self.parser = nn.Sequential(
             nn.Linear(input_dim, inner_dim),
-            nn.ReLU(),
+            nn.GELU(),
             nn.LayerNorm(inner_dim),
             nn.Linear(inner_dim, output_dim)
         )
@@ -27,7 +27,7 @@ class ConductorInstrumentsParser(nn.Module):
         self.instruments_count = instruments_count
         self.parser = nn.Sequential(
             nn.Linear(h_dim, inner_dim),
-            nn.ReLU(),
+            nn.GELU(),
             nn.LayerNorm(inner_dim),
             nn.Linear(inner_dim, self.instruments_count),
         )
@@ -35,7 +35,7 @@ class ConductorInstrumentsParser(nn.Module):
     def forward(self, conductor_h):
         x = self.parser(conductor_h)
         return x
-    
+
 class BackloopEncoder(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int, output_dim: int):
         super(BackloopEncoder, self).__init__()
@@ -43,24 +43,31 @@ class BackloopEncoder(nn.Module):
         self.gru = nn.GRU(
             input_size=input_dim,
             hidden_size=hidden_dim,
-            num_layers=1,
+            num_layers=2,
             batch_first=True,
-            dropout=0.2,
             bidirectional=False
         )
 
         self.linear = nn.Sequential(
             nn.Linear(hidden_dim, output_dim),
-            nn.ReLU(),
+            nn.GELU(),
             nn.LayerNorm(output_dim)
         )
 
     def forward(self, notes_emb):
-        # notes_sum_emb - bd, td, nd, ed
         bd, td, ind, nd, ed = notes_emb.shape
-        rhythm_emb = notes_emb.sum(2)
-        parsed = rhythm_emb.view(bd * td, nd, ed)
 
-        _, h = self.gru(parsed)
-        x = self.linear(h.squeeze(0))
-        return x.view(bd, td, -1)
+        flat_notes = notes_emb.view(bd * td * ind, nd, ed)
+        _, h = self.gru(flat_notes)
+
+        h_last_layer = h[-1]
+        h_reshaped = h_last_layer.view(bd, td, ind, -1)
+        tact_context = h_reshaped.max(dim=2)[0]
+
+        # Макса для неиспользованных инструментов
+        # mask = (tacts_instr != 129).float().unsqueeze(-1)
+        # h_masked = h_reshaped.masked_fill(mask == 0, -1e9)
+        # tact_context, _ = h_masked.max(dim=2)
+
+        x = self.linear(tact_context)
+        return x  # [bd, td, output_dim]

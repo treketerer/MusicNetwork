@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 from torch import tensor
 
-class EncoderLinear(nn.Module):
+class TextEncoderGRU(nn.Module):
     def __init__(self, alphabet_size: int, text_emb_dim:int, inner_context_size: int, output_dim: int):
-        super(EncoderLinear, self).__init__()
+        super(TextEncoderGRU, self).__init__()
 
         self.embeddings_layer = nn.Embedding(
             alphabet_size,
@@ -12,16 +12,22 @@ class EncoderLinear(nn.Module):
             padding_idx=0
         )
 
-        self.encoder = nn.Sequential(
-            nn.Linear(text_emb_dim, inner_context_size),
-            nn.ReLU(),
-            nn.Linear(inner_context_size, inner_context_size),
-            nn.ReLU(),
-            nn.LayerNorm(inner_context_size),
+        self.gru = nn.GRU(
+            input_size=text_emb_dim,
+            hidden_size=inner_context_size,
+            num_layers=1,
+            batch_first=True,
+            bidirectional=False
+        )
+
+        self.linear = nn.Sequential(
             nn.Linear(inner_context_size, output_dim),
+            nn.GELU(),
+            nn.LayerNorm(output_dim)
         )
 
     def forward(self, x):
         x = self.embeddings_layer(x)
-        x = self.encoder(x)
+        _, h = self.gru(x)
+        x = self.linear(h[-1])
         return x
